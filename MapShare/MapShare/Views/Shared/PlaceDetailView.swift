@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import CoreData
+internal import CloudKit
 
 struct PlaceDetailView: View {
     let place: Place
@@ -76,9 +77,6 @@ struct PlaceDetailView: View {
                         Text("Reactions")
                             .font(.headline)
                         
-                        TextField("Your Name", text: $authorName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
                         HStack {
                             Spacer()
                             
@@ -121,9 +119,6 @@ struct PlaceDetailView: View {
                         
                         // Add comment form
                         VStack {
-                            TextField("Your Name", text: $authorName)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                            
                             TextEditor(text: $newCommentContent)
                                 .frame(height: 80)
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5), lineWidth: 1))
@@ -132,7 +127,7 @@ struct PlaceDetailView: View {
                                 Text("Add Comment")
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(authorName.isEmpty || newCommentContent.isEmpty)
+                            .disabled(newCommentContent.isEmpty)
                         }
                         .padding(.vertical)
                         
@@ -141,6 +136,7 @@ struct PlaceDetailView: View {
                     
                     Spacer(minLength: 50)
                 }
+                .onAppear(perform: fetchUserName)
             }
             .navigationTitle("Place Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -162,11 +158,10 @@ struct PlaceDetailView: View {
         }
     }
     
-    @State private var authorName: String = ""
+    @State private var authorName: String = "Anonymous"
     @State private var newCommentContent: String = ""
 
     private func addReaction(_ type: String) {
-        guard !authorName.isEmpty else { return } // Basic validation
         withAnimation {
             let reaction = Reaction(context: viewContext)
             reaction.id = UUID()
@@ -184,7 +179,7 @@ struct PlaceDetailView: View {
     }
     
     private func addComment() {
-        guard !authorName.isEmpty, !newCommentContent.isEmpty else { return }
+        guard !newCommentContent.isEmpty else { return }
         withAnimation {
             let comment = Comment(context: viewContext)
             comment.id = UUID()
@@ -199,6 +194,16 @@ struct PlaceDetailView: View {
             } catch {
                 let nsError = error as NSError
                 print("Failed to save comment: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+    
+    private func fetchUserName() {
+        Task {
+            if let recordID = await CloudKitService.shared.getCurrentUserRecordID() {
+                // For this example, we're just using the record name.
+                // In a real app, you might fetch the user's actual name from their contacts.
+                self.authorName = recordID.recordName
             }
         }
     }

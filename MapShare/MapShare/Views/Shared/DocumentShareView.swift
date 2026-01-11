@@ -1,99 +1,51 @@
 import SwiftUI
 import CoreData
+internal import CloudKit
 
 struct DocumentShareView: View {
     let document: Document
     @Binding var isPresented: Bool
-    @Environment(\.managedObjectContext) private var viewContext
-    @State private var isSharing = false
+    
+    @State private var share: CKShare?
+    @State private var isLoading = true
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                if document.isShared {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.2.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.blue)
-                        
-                        Text("Document is Shared")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Text("This document is being shared with others.")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                        
-                        Button("Stop Sharing") {
-                            stopSharing()
-                        }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.red)
-                    }
-                } else {
-                    VStack(spacing: 16) {
-                        Image(systemName: "square.and.arrow.up.circle")
-                            .font(.system(size: 60))
-                            .foregroundColor(.blue)
-                        
-                        let docName = document.name ?? "Document"
-                        Text("Share \"\(docName)\"")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Text("Share this map with others for collaboration.")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                        
-                        Button(isSharing ? "Setting up sharing..." : "Start Sharing") {
-                            startSharing()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isSharing)
-                    }
+        Group {
+            if isLoading {
+                VStack {
+                    ProgressView()
+                    Text("Preparing share...")
                 }
-                
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Share Document")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+            } else if let share = share {
+                CloudSharingView(share: share, container: CKContainer.default(), document: document)
+            } else {
+                VStack {
+                    Text("Could not create or fetch share.")
                     Button("Close") {
                         isPresented = false
                     }
                 }
             }
         }
+        .onAppear(perform: loadShare)
     }
     
-    private func startSharing() {
-        isSharing = true
-        
-        // Simulate sharing setup
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            document.isShared = true
-            document.modifiedDate = Date()
+    private func loadShare() {
+        Task {
+            isLoading = true
             
-            do {
-                try viewContext.save()
-            } catch {
-                print("Failed to enable sharing: \(error)")
+            // Check if a share already exists
+            let existingShare = await CloudKitService.shared.getShare(for: document)
+            
+            if let existingShare = existingShare {
+                self.share = existingShare
+            } else {
+                // If not, create a new share
+                await CloudKitService.shared.shareDocument(document)
+                self.share = await CloudKitService.shared.getShare(for: document)
             }
             
-            isSharing = false
-        }
-    }
-    
-    private func stopSharing() {
-        document.isShared = false
-        document.modifiedDate = Date()
-        
-        do {
-            try viewContext.save()
-        } catch {
-            print("Failed to stop sharing: \(error)")
+            isLoading = false
         }
     }
 }

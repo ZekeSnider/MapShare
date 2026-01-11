@@ -1,5 +1,5 @@
 import CoreData
-import CloudKit
+internal import CloudKit
 
 struct PersistenceController {
     static let shared = PersistenceController()

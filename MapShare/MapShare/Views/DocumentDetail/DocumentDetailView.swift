@@ -17,28 +17,38 @@ struct DocumentDetailView: View {
     @State private var showingAddShape = false
     @State private var selectedPlace: Place?
     @State private var selectedNote: Note?
+    @State private var selectedShape: Shape?
     @State private var showingShareDocument = false
     @State private var filterSettings = FilterSettings()
+    @State private var centerOnCoordinate: CLLocationCoordinate2D?
+    @State private var panelHeight: PanelHeight = .small
     @Environment(\.managedObjectContext) private var viewContext
-    
+
     var body: some View {
         ZStack {
-            MapView(document: document, selectedPlace: $selectedPlace, selectedNote: $selectedNote, filter: filterSettings)
-            
+            MapView(
+                document: document,
+                selectedPlace: $selectedPlace,
+                selectedNote: $selectedNote,
+                selectedShape: $selectedShape,
+                filter: filterSettings,
+                centerOnCoordinate: $centerOnCoordinate
+            )
+
             VStack {
                 // Top toolbar with sharing info
                 HStack {
                     Spacer()
-                    
+
                     if document.isShared {
                         HStack(spacing: 8) {
                             Image(systemName: "person.2.fill")
                                 .foregroundColor(.blue)
-                            
+
                             Text("Shared")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             Button("Manage") {
                                 showingShareDocument = true
                             }
@@ -52,20 +62,24 @@ struct DocumentDetailView: View {
                         .padding(.trailing)
                     }
                 }
-                
+
                 Spacer()
-                
-                // Bottom action bar
-                HStack(spacing: 20) {
-                    Button(action: { showingAddPlace = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.blue)
-                            .background(Color.white, in: Circle())
+            }
+
+            // Bottom panel with items list
+            BottomPanelView(currentHeight: $panelHeight) {
+                MapItemsListView(
+                    document: document,
+                    selectedPlace: $selectedPlace,
+                    selectedNote: $selectedNote,
+                    selectedShape: $selectedShape,
+                    showingAddPlace: $showingAddPlace,
+                    showingAddNote: $showingAddNote,
+                    showingAddShape: $showingAddShape,
+                    onCenterOnItem: { coordinate in
+                        centerOnCoordinate = coordinate
                     }
-                }
-                .padding()
-                .padding(.bottom)
+                )
             }
         }
         .navigationTitle(document.name ?? "Untitled")
@@ -74,33 +88,23 @@ struct DocumentDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {
                     Menu {
-                        Button(action: { showingAddPlace = true }) {
-                            Label("Add Place", systemImage: "plus")
-                        }
-                        
-                        Button(action: { showingAddNote = true }) {
-                            Label("Add Note", systemImage: "note.text.badge.plus")
-                        }
-                        
-                        Button(action: { showingAddShape = true }) {
-                            Label("Add Emoji", systemImage: "face.smiling")
-                        }
-                        
                         Button(action: { addSampleRoute() }) {
                             Label("Add Sample Route", systemImage: "road.lanes")
                         }
-                        
+
                         Button(action: { addSampleArea() }) {
                             Label("Add Sample Area", systemImage: "square.dashed")
                         }
-                        
+
+                        Divider()
+
                         Button(action: { showingShareDocument = true }) {
                             Label("Share Document", systemImage: "square.and.arrow.up")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
-                    
+
                     Menu {
                         Toggle(isOn: $filterSettings.showPlaces) {
                             Label("Places", systemImage: "mappin")
@@ -142,7 +146,7 @@ struct DocumentDetailView: View {
             DocumentShareView(document: document, isPresented: $showingShareDocument)
         }
     }
-    
+
     private func addSampleRoute() {
         withAnimation {
             let coordinates = [
@@ -162,7 +166,7 @@ struct DocumentDetailView: View {
             }
         }
     }
-    
+
     private func addSampleArea() {
         withAnimation {
             let coordinates = [
@@ -187,7 +191,7 @@ struct DocumentDetailView: View {
 #Preview {
     let context = PersistenceController.preview.container.viewContext
     let document = Document(name: "Sample Document", context: context)
-    
+
     return NavigationView {
         DocumentDetailView(document: document)
     }

@@ -1,30 +1,24 @@
-import CloudKit
+internal import CloudKit
 import CoreData
 import CoreLocation
 import Foundation
-import Combine
+import Observation
 
-class CloudKitService: ObservableObject {
+@Observable
+class CloudKitService {
     static let shared = CloudKitService()
     
-    private let container = CKContainer(identifier: "iCloud.com.mapshare.app")
-    private let publicDatabase: CKDatabase
-    private let privateDatabase: CKDatabase
-    private let sharedDatabase: CKDatabase
+    private let container = PersistenceController.shared.container
     
-    @Published var isAvailable = false
-    @Published var userPresences: [String: UserPresence] = [:]
+    var isAvailable = false
+    var userPresences: [String: UserPresence] = [:]
     
     private init() {
-        publicDatabase = container.publicCloudDatabase
-        privateDatabase = container.privateCloudDatabase
-        sharedDatabase = container.sharedCloudDatabase
-        
         checkCloudKitAvailability()
     }
     
     private func checkCloudKitAvailability() {
-        container.accountStatus { [weak self] status, error in
+        CKContainer.default().accountStatus { [weak self] status, error in
             DispatchQueue.main.async {
                 self?.isAvailable = (status == .available)
             }
@@ -33,53 +27,39 @@ class CloudKitService: ObservableObject {
     
     // MARK: - Document Sharing
     
-    func shareDocument(_ document: Document) async throws -> CKShare {
-        guard let documentID = document.objectID.uriRepresentation().absoluteString.data(using: .utf8) else {
-            throw CloudKitError.invalidDocument
+    func getShare(for document: Document) async -> CKShare? {
+        do {
+            let shares = try await container.fetchShares(matching: [document.objectID])
+            return shares[document.objectID]
+        } catch {
+            print("Failed to fetch share for document: \(error)")
+            return nil
         }
-        
-        let recordID = CKRecord.ID(recordName: document.id?.uuidString ?? UUID().uuidString)
-        let record = CKRecord(recordType: "Document", recordID: recordID)
-        
-        record["name"] = document.name
-        record["createdDate"] = document.createdDate
-        record["modifiedDate"] = document.modifiedDate
-        record["documentData"] = documentID
-        
-        let share = CKShare(rootRecord: record)
-        share[CKShare.SystemFieldKey.title] = document.name
-        share.publicPermission = .none
-        
-        let operation = CKModifyRecordsOperation(
-            recordsToSave: [record, share],
-            recordIDsToDelete: nil
-        )
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            operation.modifyRecordsResultBlock = { result in
-                switch result {
-                case .success():
-                    continuation.resume(returning: share)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-            
-            privateDatabase.add(operation)
+    }
+
+    func shareDocument(_ document: Document) async {
+        do {
+            _ = try await container.share([document], to: nil)
+        } catch {
+            print("Failed to share document: \(error)")
         }
     }
     
-    func stopSharingDocument(_ document: Document) async throws {
-        guard let shareRecordName = document.shareMetadata else { return }
-        
-        // In a real implementation, you would:
-        // 1. Get the CKShare record
-        // 2. Delete it from CloudKit
-        // 3. Update the local document
-        
-        // For now, we'll just update locally
-        document.isShared = false
-        document.shareMetadata = nil
+    func stopSharing(share: CKShare) async {
+//        do {
+//            try await container.purgeObjectsAndRecords(in: [share.recordID], in: .private)
+//        } catch {
+//            print("Failed to stop sharing: \(error)")
+//        }
+    }
+    
+    func getCurrentUserRecordID() async -> CKRecord.ID? {
+        do {
+            return try await CKContainer.default().userRecordID()
+        } catch {
+            print("Failed to fetch user record ID: \(error)")
+            return nil
+        }
     }
     
     // MARK: - User Presence
@@ -88,7 +68,7 @@ class CloudKitService: ObservableObject {
         guard isAvailable else { return }
         
         let presence = UserPresence(
-            userID: await getCurrentUserID(),
+            userID: (try? await CKContainer.default().userRecordID().recordName) ?? "currentUser",
             documentID: document.id?.uuidString ?? "",
             location: location,
             lastSeen: Date()

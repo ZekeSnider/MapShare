@@ -2,14 +2,34 @@ import SwiftUI
 import MapKit
 import CoreData
 
+import SwiftUI
+import MapKit
+import CoreData
+
 struct MapView: View {
     let document: Document
     @Binding var selectedPlace: Place?
     @Binding var selectedNote: Note?
+    @Binding var selectedShape: Shape?
     let filter: FilterSettings
+    @Binding var centerOnCoordinate: CLLocationCoordinate2D?
+    @State private var cloudKitService = CloudKitService.shared
 
     var body: some View {
-        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, selectedNote: $selectedNote, filter: filter)
+        MapViewRepresentable(
+            document: document,
+            selectedPlace: $selectedPlace,
+            selectedNote: $selectedNote,
+            selectedShape: $selectedShape,
+            filter: filter,
+            centerOnCoordinate: $centerOnCoordinate,
+            userPresences: cloudKitService.userPresences
+        )
+        .onAppear {
+            Task {
+                await cloudKitService.observeUserPresence(for: document)
+            }
+        }
     }
 }
 
@@ -17,7 +37,10 @@ struct MapViewRepresentable: UIViewRepresentable {
     let document: Document
     @Binding var selectedPlace: Place?
     @Binding var selectedNote: Note?
+    @Binding var selectedShape: Shape?
     let filter: FilterSettings
+    @Binding var centerOnCoordinate: CLLocationCoordinate2D?
+    let userPresences: [String: UserPresence]
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -25,6 +48,7 @@ struct MapViewRepresentable: UIViewRepresentable {
         mapView.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: "place")
         mapView.register(NoteAnnotationView.self, forAnnotationViewWithReuseIdentifier: "note")
         mapView.register(ShapeAnnotationView.self, forAnnotationViewWithReuseIdentifier: "shape")
+        mapView.register(UserPresenceAnnotationView.self, forAnnotationViewWithReuseIdentifier: "user")
         return mapView
     }
 
@@ -42,7 +66,29 @@ struct MapViewRepresentable: UIViewRepresentable {
         if filter.showShapes {
             annotations.append(contentsOf: document.shapesArray as [MKAnnotation])
         }
+
+        // Add user presences
+        for presence in userPresences {
+            if let location = presence.value.location {
+                let annotation = UserPresenceAnnotation(userID: presence.key, coordinate: location)
+                annotations.append(annotation)
+            }
+        }
+
         uiView.addAnnotations(annotations)
+
+        // Update selection state on annotation views
+        for annotation in uiView.annotations {
+            if let view = uiView.view(for: annotation) {
+                if let placeView = view as? PlaceAnnotationView, let place = annotation as? Place {
+                    placeView.isItemSelected = selectedPlace?.id == place.id
+                } else if let noteView = view as? NoteAnnotationView, let note = annotation as? Note {
+                    noteView.isItemSelected = selectedNote?.id == note.id
+                } else if let shapeView = view as? ShapeAnnotationView, let shape = annotation as? Shape {
+                    shapeView.isItemSelected = selectedShape?.id == shape.id
+                }
+            }
+        }
 
         var overlays: [MKOverlay] = []
         if filter.showRoutes {
@@ -52,9 +98,24 @@ struct MapViewRepresentable: UIViewRepresentable {
             overlays.append(contentsOf: document.areasArray.map { $0.polygon })
         }
         uiView.addOverlays(overlays)
-        
-        if !annotations.isEmpty || !overlays.isEmpty {
-            centerMap(on: uiView)
+
+        // Center on specific coordinate if requested
+        if let coordinate = centerOnCoordinate {
+            let region = MKCoordinateRegion(
+                center: coordinate,
+                latitudinalMeters: 500,
+                longitudinalMeters: 500
+            )
+            uiView.setRegion(region, animated: true)
+            DispatchQueue.main.async {
+                self.centerOnCoordinate = nil
+            }
+        } else if !annotations.isEmpty || !overlays.isEmpty {
+            // Only auto-center on first load
+            if !context.coordinator.hasInitializedRegion {
+                centerMap(on: uiView)
+                context.coordinator.hasInitializedRegion = true
+            }
         }
     }
     
@@ -84,6 +145,7 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapViewRepresentable
+        var hasInitializedRegion = false
 
         init(_ parent: MapViewRepresentable) {
             self.parent = parent
@@ -100,6 +162,10 @@ struct MapViewRepresentable: UIViewRepresentable {
             } else if let shape = annotation as? Shape {
                 let view = mapView.dequeueReusableAnnotationView(withIdentifier: "shape", for: annotation) as! ShapeAnnotationView
                 view.shape = shape
+                return view
+            } else if let user = annotation as? UserPresenceAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: "user", for: annotation) as! UserPresenceAnnotationView
+                view.user = user
                 return view
             }
             return nil
@@ -128,10 +194,48 @@ struct MapViewRepresentable: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             if let placeAnnotation = view.annotation as? Place {
                 parent.selectedPlace = placeAnnotation
+                parent.selectedNote = nil
+                parent.selectedShape = nil
             } else if let noteAnnotation = view.annotation as? Note {
                 parent.selectedNote = noteAnnotation
+                parent.selectedPlace = nil
+                parent.selectedShape = nil
+            } else if let shapeAnnotation = view.annotation as? Shape {
+                parent.selectedShape = shapeAnnotation
+                parent.selectedPlace = nil
+                parent.selectedNote = nil
             }
         }
+    }
+}
+
+// MARK: - User Presence Annotation
+
+class UserPresenceAnnotation: NSObject, MKAnnotation {
+    let userID: String
+    let coordinate: CLLocationCoordinate2D
+
+    init(userID: String, coordinate: CLLocationCoordinate2D) {
+        self.userID = userID
+        self.coordinate = coordinate
+    }
+}
+
+class UserPresenceAnnotationView: MKAnnotationView {
+    var user: UserPresenceAnnotation?
+    
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        
+        backgroundColor = .blue
+        frame = CGRect(x: 0, y: 0, width: 20, height: 20)
+        layer.cornerRadius = 10
+        layer.borderWidth = 2
+        layer.borderColor = UIColor.white.cgColor
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 
@@ -144,13 +248,19 @@ class PlaceAnnotationView: MKAnnotationView {
         }
     }
 
+    var isItemSelected: Bool = false {
+        didSet {
+            updateView()
+        }
+    }
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         frame = CGRect(x: 0, y: 0, width: 30, height: 30)
         centerOffset = CGPoint(x: 0, y: -frame.size.height / 2)
         updateView()
     }
-    
+
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -158,40 +268,80 @@ class PlaceAnnotationView: MKAnnotationView {
     private func updateView() {
         subviews.forEach { $0.removeFromSuperview() }
         guard let place = place else { return }
+
+        let size: CGFloat = isItemSelected ? 44 : 30
+        frame = CGRect(x: 0, y: 0, width: size, height: size)
+        centerOffset = CGPoint(x: 0, y: -frame.size.height / 2)
+
         let circle = UIView(frame: bounds)
         circle.backgroundColor = UIColor(Color(hex: place.iconColor ?? "#FF3B30"))
-        circle.layer.cornerRadius = 15
-        
+        circle.layer.cornerRadius = size / 2
+
+        if isItemSelected {
+            circle.layer.borderWidth = 3
+            circle.layer.borderColor = UIColor.white.cgColor
+            circle.layer.shadowColor = UIColor.black.cgColor
+            circle.layer.shadowOffset = CGSize(width: 0, height: 2)
+            circle.layer.shadowRadius = 4
+            circle.layer.shadowOpacity = 0.3
+        }
+
         let image = UIImage(systemName: place.iconName ?? "mappin")
         let imageView = UIImageView(image: image)
         imageView.tintColor = .white
-        imageView.frame = bounds.insetBy(dx: 7, dy: 7)
-        
+        let inset: CGFloat = isItemSelected ? 10 : 7
+        imageView.frame = bounds.insetBy(dx: inset, dy: inset)
+
         addSubview(circle)
         addSubview(imageView)
     }
 }
 
 class NoteAnnotationView: MKAnnotationView {
+    var isItemSelected: Bool = false {
+        didSet {
+            updateView()
+        }
+    }
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        let image = UIImage(systemName: "note.text")
-        let imageView = UIImageView(image: image)
-        imageView.tintColor = .yellow
-        imageView.frame = CGRect(x: 0, y: 0, width: 24, height: 24)
-        
-        let container = UIView(frame: CGRect(x: -15, y: -15, width: 30, height: 30))
-        container.backgroundColor = .black.withAlphaComponent(0.6)
-        container.layer.cornerRadius = 15
-        
-        imageView.center = CGPoint(x: 15, y: 15)
-        container.addSubview(imageView)
-        
-        addSubview(container)
+        updateView()
     }
 
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    private func updateView() {
+        subviews.forEach { $0.removeFromSuperview() }
+
+        let size: CGFloat = isItemSelected ? 44 : 30
+        frame = CGRect(x: 0, y: 0, width: size, height: size)
+
+        let image = UIImage(systemName: "note.text")
+        let imgView = UIImageView(image: image)
+        imgView.tintColor = .yellow
+        let iconSize: CGFloat = isItemSelected ? 32 : 24
+        imgView.frame = CGRect(x: 0, y: 0, width: iconSize, height: iconSize)
+
+        let cont = UIView(frame: CGRect(x: -size/2, y: -size/2, width: size, height: size))
+        cont.backgroundColor = .black.withAlphaComponent(0.6)
+        cont.layer.cornerRadius = size / 2
+
+        if isItemSelected {
+            cont.layer.borderWidth = 3
+            cont.layer.borderColor = UIColor.white.cgColor
+            cont.layer.shadowColor = UIColor.black.cgColor
+            cont.layer.shadowOffset = CGSize(width: 0, height: 2)
+            cont.layer.shadowRadius = 4
+            cont.layer.shadowOpacity = 0.3
+        }
+
+        imgView.center = CGPoint(x: size/2, y: size/2)
+        cont.addSubview(imgView)
+
+        addSubview(cont)
     }
 }
 
@@ -201,25 +351,47 @@ class ShapeAnnotationView: MKAnnotationView {
             updateView()
         }
     }
-    
+
+    var isItemSelected: Bool = false {
+        didSet {
+            updateView()
+        }
+    }
+
     private let label = UILabel()
+    private let backgroundView = UIView()
 
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        frame = CGRect(x: 0, y: 0, width: 40, height: 40)
-        label.font = .systemFont(ofSize: 36)
-        label.textAlignment = .center
-        addSubview(label)
-        label.frame = bounds
         updateView()
     }
-    
+
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     private func updateView() {
-        label.text = shape?.emoji ?? "❓"
+        subviews.forEach { $0.removeFromSuperview() }
+
+        let size: CGFloat = isItemSelected ? 56 : 40
+        frame = CGRect(x: 0, y: 0, width: size, height: size)
+
+        if isItemSelected {
+            let bg = UIView(frame: bounds)
+            bg.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+            bg.layer.cornerRadius = size / 2
+            bg.layer.shadowColor = UIColor.black.cgColor
+            bg.layer.shadowOffset = CGSize(width: 0, height: 2)
+            bg.layer.shadowRadius = 4
+            bg.layer.shadowOpacity = 0.3
+            addSubview(bg)
+        }
+
+        let lbl = UILabel(frame: bounds)
+        lbl.font = .systemFont(ofSize: isItemSelected ? 44 : 36)
+        lbl.textAlignment = .center
+        lbl.text = shape?.emoji ?? "❓"
+        addSubview(lbl)
     }
 }
 
@@ -243,7 +415,14 @@ struct NoteDetailView: View {
 #Preview {
     let context = PersistenceController.preview.container.viewContext
     let document = Document(name: "Sample Document", context: context)
-    
-    return MapView(document: document, selectedPlace: .constant(nil), selectedNote: .constant(nil), filter: FilterSettings())
-        .environment(\.managedObjectContext, context)
+
+    return MapView(
+        document: document,
+        selectedPlace: .constant(nil),
+        selectedNote: .constant(nil),
+        selectedShape: .constant(nil),
+        filter: FilterSettings(),
+        centerOnCoordinate: .constant(nil)
+    )
+    .environment(\.managedObjectContext, context)
 }
