@@ -141,31 +141,67 @@ class PlaceAnnotationView: MKAnnotationView {
         }
     }
 
+    private let containerView = UIView()
+    private let pinView = UIView()
+    private let iconImageView = UIImageView()
+    private let nameLabel = UILabel()
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        frame = CGRect(x: 0, y: 0, width: 30, height: 30)
-        centerOffset = CGPoint(x: 0, y: -frame.size.height / 2)
-        updateView()
+        setupViews()
     }
 
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private func setupViews() {
+        // Pin circle
+        pinView.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
+        pinView.layer.cornerRadius = 15
+
+        // Icon
+        iconImageView.tintColor = .white
+        iconImageView.contentMode = .scaleAspectFit
+        iconImageView.frame = pinView.bounds.insetBy(dx: 7, dy: 7)
+
+        // Name label
+        nameLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        nameLabel.textColor = .label
+        nameLabel.textAlignment = .center
+        nameLabel.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.85)
+        nameLabel.layer.cornerRadius = 4
+        nameLabel.layer.masksToBounds = true
+
+        pinView.addSubview(iconImageView)
+        addSubview(pinView)
+        addSubview(nameLabel)
+    }
+
     private func updateView() {
-        subviews.forEach { $0.removeFromSuperview() }
         guard let place = place else { return }
-        let circle = UIView(frame: bounds)
-        circle.backgroundColor = UIColor(Color(hex: place.iconColor ?? "#FF3B30"))
-        circle.layer.cornerRadius = 15
 
-        let image = UIImage(systemName: place.iconName ?? "mappin")
-        let imageView = UIImageView(image: image)
-        imageView.tintColor = .white
-        imageView.frame = bounds.insetBy(dx: 7, dy: 7)
+        // Update pin color
+        pinView.backgroundColor = UIColor(Color(hex: place.iconColor ?? "#FF3B30"))
 
-        addSubview(circle)
-        addSubview(imageView)
+        // Update icon
+        iconImageView.image = UIImage(systemName: place.iconName ?? "mappin")
+
+        // Update label
+        nameLabel.text = "  \(place.name ?? "")  "
+        nameLabel.sizeToFit()
+
+        // Layout: pin on top, label below
+        let labelWidth = nameLabel.frame.width
+        let totalWidth = max(30, labelWidth)
+        let totalHeight: CGFloat = 30 + 4 + nameLabel.frame.height
+
+        frame = CGRect(x: 0, y: 0, width: totalWidth, height: totalHeight)
+        centerOffset = CGPoint(x: 0, y: -totalHeight / 2)
+
+        pinView.frame = CGRect(x: (totalWidth - 30) / 2, y: 0, width: 30, height: 30)
+        iconImageView.frame = pinView.bounds.insetBy(dx: 7, dy: 7)
+        nameLabel.frame = CGRect(x: (totalWidth - labelWidth) / 2, y: 34, width: labelWidth, height: nameLabel.frame.height)
     }
 }
 
