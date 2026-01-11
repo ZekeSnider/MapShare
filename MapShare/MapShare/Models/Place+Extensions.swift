@@ -3,7 +3,15 @@ import CoreData
 import CoreLocation
 import MapKit
 
-extension Place {
+extension Place: MKAnnotation {
+    public var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+    
+    public var title: String? {
+        name
+    }
+    
     convenience init(name: String, coordinate: CLLocationCoordinate2D, context: NSManagedObjectContext) {
         self.init(context: context)
         self.id = UUID()
@@ -14,10 +22,6 @@ extension Place {
         self.modifiedDate = Date()
         self.iconName = "mappin"
         self.iconColor = "#FF3B30"
-    }
-    
-    var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
     
     var commentsArray: [Comment] {

@@ -2,6 +2,7 @@ import CloudKit
 import CoreData
 import CoreLocation
 import Foundation
+import Combine
 
 class CloudKitService: ObservableObject {
     static let shared = CloudKitService()

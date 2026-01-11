@@ -5,88 +5,238 @@ import CoreData
 struct MapView: View {
     let document: Document
     @Binding var selectedPlace: Place?
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
-        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-    )
-    
+    @Binding var selectedNote: Note?
+    let filter: FilterSettings
+
     var body: some View {
-        Map(coordinateRegion: $region, annotationItems: document.placesArray) { place in
-            MapAnnotation(coordinate: place.coordinate) {
-                Button(action: { selectedPlace = place }) {
-                    VStack {
-                        ZStack {
-                            Circle()
-                                .fill(Color(hex: place.iconColor ?? "#FF3B30"))
-                                .frame(width: 30, height: 30)
-                            
-                            Image(systemName: place.iconName ?? "mappin")
-                                .foregroundColor(.white)
-                                .font(.system(size: 16, weight: .medium))
-                        }
-                        
-                        Text(place.name ?? "")
-                            .font(.caption)
-                            .padding(4)
-                            .background(Color.white.opacity(0.8))
-                            .cornerRadius(4)
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-        .onAppear {
-            centerMapOnPlaces()
-        }
-    }
-    
-    private func centerMapOnPlaces() {
-        let places = document.placesArray
-        guard !places.isEmpty else { return }
-        
-        let coordinates = places.map { $0.coordinate }
-        let centerLatitude = coordinates.reduce(0) { $0 + $1.latitude } / Double(coordinates.count)
-        let centerLongitude = coordinates.reduce(0) { $0 + $1.longitude } / Double(coordinates.count)
-        
-        let minLat = coordinates.map { $0.latitude }.min() ?? centerLatitude
-        let maxLat = coordinates.map { $0.latitude }.max() ?? centerLatitude
-        let minLon = coordinates.map { $0.longitude }.min() ?? centerLongitude
-        let maxLon = coordinates.map { $0.longitude }.max() ?? centerLongitude
-        
-        let latDelta = max(0.01, (maxLat - minLat) * 1.5)
-        let lonDelta = max(0.01, (maxLon - minLon) * 1.5)
-        
-        region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: centerLatitude, longitude: centerLongitude),
-            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
-        )
+        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, selectedNote: $selectedNote, filter: filter)
     }
 }
 
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
+struct MapViewRepresentable: UIViewRepresentable {
+    let document: Document
+    @Binding var selectedPlace: Place?
+    @Binding var selectedNote: Note?
+    let filter: FilterSettings
+
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: "place")
+        mapView.register(NoteAnnotationView.self, forAnnotationViewWithReuseIdentifier: "note")
+        mapView.register(ShapeAnnotationView.self, forAnnotationViewWithReuseIdentifier: "shape")
+        return mapView
+    }
+
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        uiView.removeAnnotations(uiView.annotations)
+        uiView.removeOverlays(uiView.overlays)
+
+        var annotations: [MKAnnotation] = []
+        if filter.showPlaces {
+            annotations.append(contentsOf: document.placesArray as [MKAnnotation])
+        }
+        if filter.showNotes {
+            annotations.append(contentsOf: document.notesArray as [MKAnnotation])
+        }
+        if filter.showShapes {
+            annotations.append(contentsOf: document.shapesArray as [MKAnnotation])
+        }
+        uiView.addAnnotations(annotations)
+
+        var overlays: [MKOverlay] = []
+        if filter.showRoutes {
+            overlays.append(contentsOf: document.routesArray.map { $0.polyline })
+        }
+        if filter.showAreas {
+            overlays.append(contentsOf: document.areasArray.map { $0.polygon })
+        }
+        uiView.addOverlays(overlays)
+        
+        if !annotations.isEmpty || !overlays.isEmpty {
+            centerMap(on: uiView)
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    private func centerMap(on mapView: MKMapView) {
+        let annotations = mapView.annotations
+        let overlays = mapView.overlays
+        
+        guard !annotations.isEmpty || !overlays.isEmpty else { return }
+
+        var mapRect = MKMapRect.null
+        
+        annotations.forEach { annotation in
+            let point = MKMapPoint(annotation.coordinate)
+            mapRect = mapRect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
+        }
+        
+        overlays.forEach { overlay in
+            mapRect = mapRect.union(overlay.boundingMapRect)
         }
 
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+        mapView.setVisibleMapRect(mapRect, edgePadding: UIEdgeInsets(top: 50, left: 50, bottom: 50, right: 50), animated: true)
+    }
+
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: MapViewRepresentable
+
+        init(_ parent: MapViewRepresentable) {
+            self.parent = parent
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let place = annotation as? Place {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: "place", for: annotation) as! PlaceAnnotationView
+                view.place = place
+                return view
+            } else if let note = annotation as? Note {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: "note", for: annotation) as! NoteAnnotationView
+                return view
+            } else if let shape = annotation as? Shape {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: "shape", for: annotation) as! ShapeAnnotationView
+                view.shape = shape
+                return view
+            }
+            return nil
+        }
+        
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                if let route = parent.document.routesArray.first(where: { $0.polyline == polyline }) {
+                    renderer.strokeColor = UIColor(Color(hex: route.strokeColor ?? "#FF3B30"))
+                    renderer.lineWidth = CGFloat(route.strokeWidth)
+                }
+                return renderer
+            } else if let polygon = overlay as? MKPolygon {
+                let renderer = MKPolygonRenderer(polygon: polygon)
+                if let area = parent.document.areasArray.first(where: { $0.polygon == polygon }) {
+                    renderer.fillColor = UIColor(Color(hex: area.fillColor ?? "#FF3B30")).withAlphaComponent(0.4)
+                    renderer.strokeColor = UIColor(Color(hex: area.strokeColor ?? "#FF9500"))
+                    renderer.lineWidth = 1
+                }
+                return renderer
+            }
+            return MKOverlayRenderer()
+        }
+        
+        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            if let placeAnnotation = view.annotation as? Place {
+                parent.selectedPlace = placeAnnotation
+            } else if let noteAnnotation = view.annotation as? Note {
+                parent.selectedNote = noteAnnotation
+            }
+        }
+    }
+}
+
+// MARK: - Custom Annotation Views
+
+class PlaceAnnotationView: MKAnnotationView {
+    var place: Place? {
+        didSet {
+            updateView()
+        }
+    }
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        frame = CGRect(x: 0, y: 0, width: 30, height: 30)
+        centerOffset = CGPoint(x: 0, y: -frame.size.height / 2)
+        updateView()
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func updateView() {
+        subviews.forEach { $0.removeFromSuperview() }
+        guard let place = place else { return }
+        let circle = UIView(frame: bounds)
+        circle.backgroundColor = UIColor(Color(hex: place.iconColor ?? "#FF3B30"))
+        circle.layer.cornerRadius = 15
+        
+        let image = UIImage(systemName: place.iconName ?? "mappin")
+        let imageView = UIImageView(image: image)
+        imageView.tintColor = .white
+        imageView.frame = bounds.insetBy(dx: 7, dy: 7)
+        
+        addSubview(circle)
+        addSubview(imageView)
+    }
+}
+
+class NoteAnnotationView: MKAnnotationView {
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        let image = UIImage(systemName: "note.text")
+        let imageView = UIImageView(image: image)
+        imageView.tintColor = .yellow
+        imageView.frame = CGRect(x: 0, y: 0, width: 24, height: 24)
+        
+        let container = UIView(frame: CGRect(x: -15, y: -15, width: 30, height: 30))
+        container.backgroundColor = .black.withAlphaComponent(0.6)
+        container.layer.cornerRadius = 15
+        
+        imageView.center = CGPoint(x: 15, y: 15)
+        container.addSubview(imageView)
+        
+        addSubview(container)
+    }
+
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+class ShapeAnnotationView: MKAnnotationView {
+    var shape: Shape? {
+        didSet {
+            updateView()
+        }
+    }
+    
+    private let label = UILabel()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        frame = CGRect(x: 0, y: 0, width: 40, height: 40)
+        label.font = .systemFont(ofSize: 36)
+        label.textAlignment = .center
+        addSubview(label)
+        label.frame = bounds
+        updateView()
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func updateView() {
+        label.text = shape?.emoji ?? "❓"
+    }
+}
+
+
+struct NoteDetailView: View {
+    let note: Note
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                Text(note.content ?? "Empty note")
+                    .padding()
+                
+                Spacer()
+            }
+            .navigationTitle("Note")
+        }
     }
 }
 
@@ -94,6 +244,6 @@ extension Color {
     let context = PersistenceController.preview.container.viewContext
     let document = Document(name: "Sample Document", context: context)
     
-    return MapView(document: document, selectedPlace: .constant(nil))
+    return MapView(document: document, selectedPlace: .constant(nil), selectedNote: .constant(nil), filter: FilterSettings())
         .environment(\.managedObjectContext, context)
 }

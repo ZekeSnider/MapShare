@@ -36,7 +36,8 @@ struct DocumentShareView: View {
                             .font(.system(size: 60))
                             .foregroundColor(.blue)
                         
-                        Text("Share \"\(document.name ?? "Document")\"")
+                        let docName = document.name ?? "Document"
+                        Text("Share \"\(docName)\"")
                             .font(.title2)
                             .fontWeight(.semibold)
                         

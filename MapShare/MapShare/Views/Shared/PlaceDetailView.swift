@@ -72,27 +72,32 @@ struct PlaceDetailView: View {
                     }
                     
                     // Reactions
-                    HStack {
+                    VStack(alignment: .leading) {
                         Text("Reactions")
                             .font(.headline)
                         
-                        Spacer()
+                        TextField("Your Name", text: $authorName)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
                         
                         HStack {
-                            Button(action: { addReaction("thumbsUp") }) {
-                                HStack {
-                                    Image(systemName: "hand.thumbsup")
-                                    Text("\(place.thumbsUpCount)")
-                                }
-                                .foregroundColor(.green)
-                            }
+                            Spacer()
                             
-                            Button(action: { addReaction("thumbsDown") }) {
-                                HStack {
-                                    Image(systemName: "hand.thumbsdown")
-                                    Text("\(place.thumbsDownCount)")
+                            HStack {
+                                Button(action: { addReaction("thumbsUp") }) {
+                                    HStack {
+                                        Image(systemName: "hand.thumbsup")
+                                        Text("\(place.thumbsUpCount)")
+                                    }
+                                    .foregroundColor(.green)
                                 }
-                                .foregroundColor(.red)
+                                
+                                Button(action: { addReaction("thumbsDown") }) {
+                                    HStack {
+                                        Image(systemName: "hand.thumbsdown")
+                                        Text("\(place.thumbsDownCount)")
+                                    }
+                                    .foregroundColor(.red)
+                                }
                             }
                         }
                     }
@@ -113,6 +118,24 @@ struct PlaceDetailView: View {
                                 .foregroundColor(.secondary)
                                 .italic()
                         }
+                        
+                        // Add comment form
+                        VStack {
+                            TextField("Your Name", text: $authorName)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                            
+                            TextEditor(text: $newCommentContent)
+                                .frame(height: 80)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5), lineWidth: 1))
+                            
+                            Button(action: addComment) {
+                                Text("Add Comment")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(authorName.isEmpty || newCommentContent.isEmpty)
+                        }
+                        .padding(.vertical)
+                        
                     }
                     .padding(.horizontal)
                     
@@ -139,12 +162,16 @@ struct PlaceDetailView: View {
         }
     }
     
+    @State private var authorName: String = ""
+    @State private var newCommentContent: String = ""
+
     private func addReaction(_ type: String) {
+        guard !authorName.isEmpty else { return } // Basic validation
         withAnimation {
             let reaction = Reaction(context: viewContext)
             reaction.id = UUID()
             reaction.type = type
-            reaction.authorName = "Current User" // TODO: Implement user management
+            reaction.authorName = authorName
             reaction.place = place
             
             do {
@@ -152,6 +179,26 @@ struct PlaceDetailView: View {
             } catch {
                 let nsError = error as NSError
                 print("Failed to save reaction: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+    
+    private func addComment() {
+        guard !authorName.isEmpty, !newCommentContent.isEmpty else { return }
+        withAnimation {
+            let comment = Comment(context: viewContext)
+            comment.id = UUID()
+            comment.authorName = authorName
+            comment.content = newCommentContent
+            comment.createdDate = Date()
+            comment.place = place
+            
+            do {
+                try viewContext.save()
+                newCommentContent = ""
+            } catch {
+                let nsError = error as NSError
+                print("Failed to save comment: \(nsError), \(nsError.userInfo)")
             }
         }
     }
@@ -290,6 +337,8 @@ struct EditPlaceView: View {
 }
 
 #Preview {
-    PlaceDetailView(place: PersistenceController.preview.container.viewContext.registeredObjects.compactMap { $0 as? Place }.first!)
-        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    let context = PersistenceController.preview.container.viewContext
+    let place = Place(name: "Preview Place", coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194), context: context)
+    return PlaceDetailView(place: place)
+        .environment(\.managedObjectContext, context)
 }
