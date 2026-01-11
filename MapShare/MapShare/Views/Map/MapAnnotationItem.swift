@@ -8,4 +8,3 @@ protocol MapAnnotationItem: Identifiable {
 }
 
 extension Place: MapAnnotationItem {}
-extension Note: MapAnnotationItem {}

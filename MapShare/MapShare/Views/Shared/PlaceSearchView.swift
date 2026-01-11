@@ -9,10 +9,16 @@ struct SearchResult: Identifiable, Hashable {
     let address: String
     let coordinate: CLLocationCoordinate2D
     let category: String?
+    let phoneNumber: String?
+    let url: URL?
+    let mapItemIdentifier: String?
 
     init(mapItem: MKMapItem) {
         self.name = mapItem.name ?? "Unknown"
         self.category = mapItem.pointOfInterestCategory?.rawValue
+        self.phoneNumber = mapItem.phoneNumber
+        self.url = mapItem.url
+        self.mapItemIdentifier = mapItem.identifier?.rawValue
 
         let placemark = mapItem.placemark
         var components: [String] = []
@@ -184,7 +190,10 @@ struct PlaceSearchView: View {
                     isPresented: $isPresented,
                     prefilledName: result.name,
                     prefilledCoordinate: result.coordinate,
-                    prefilledAddress: result.address
+                    prefilledAddress: result.address,
+                    prefilledPhoneNumber: result.phoneNumber,
+                    prefilledWebsiteURL: result.url,
+                    prefilledMapItemIdentifier: result.mapItemIdentifier
                 )
             }
             .navigationDestination(for: String.self) { _ in
@@ -193,7 +202,10 @@ struct PlaceSearchView: View {
                     isPresented: $isPresented,
                     prefilledName: nil,
                     prefilledCoordinate: nil,
-                    prefilledAddress: nil
+                    prefilledAddress: nil,
+                    prefilledPhoneNumber: nil,
+                    prefilledWebsiteURL: nil,
+                    prefilledMapItemIdentifier: nil
                 )
             }
         }
@@ -263,6 +275,9 @@ struct AddPlaceViewEmbedded: View {
     var prefilledName: String?
     var prefilledCoordinate: CLLocationCoordinate2D?
     var prefilledAddress: String?
+    var prefilledPhoneNumber: String?
+    var prefilledWebsiteURL: URL?
+    var prefilledMapItemIdentifier: String?
 
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -406,6 +421,10 @@ struct AddPlaceViewEmbedded: View {
             newPlace.iconName = selectedIcon
             newPlace.iconColor = selectedColor
             newPlace.document = document
+            newPlace.address = prefilledAddress
+            newPlace.phoneNumber = prefilledPhoneNumber
+            newPlace.websiteURL = prefilledWebsiteURL
+            newPlace.mapItemIdentifier = prefilledMapItemIdentifier
 
             do {
                 try viewContext.save()

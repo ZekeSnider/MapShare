@@ -49,7 +49,7 @@ struct PlaceDetailView: View {
                                 Circle()
                                     .fill(Color(hex: place.iconColor ?? "#FF3B30"))
                                     .frame(width: 30, height: 30)
-                                
+
                                 Image(systemName: place.iconName ?? "mappin")
                                     .foregroundColor(.white)
                                     .font(.system(size: 16, weight: .medium))
@@ -59,13 +59,66 @@ struct PlaceDetailView: View {
                     .frame(height: 200)
                     .cornerRadius(12)
                     .padding(.horizontal)
-                    
+
+                    // Address and Actions
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let address = place.address, !address.isEmpty {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.secondary)
+                                Text(address)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if let phoneNumber = place.phoneNumber, !phoneNumber.isEmpty {
+                            HStack(spacing: 12) {
+                                Image(systemName: "phone.fill")
+                                    .foregroundColor(.secondary)
+                                Link(phoneNumber, destination: URL(string: "tel:\(phoneNumber.replacingOccurrences(of: " ", with: ""))")!)
+                                    .font(.subheadline)
+                            }
+                        }
+
+                        if let websiteURL = place.websiteURL {
+                            Link(destination: websiteURL) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "globe")
+                                        .foregroundColor(.secondary)
+                                    Text(websiteURL.host ?? "Website")
+                                        .font(.subheadline)
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+
+                        Button {
+                            openInAppleMaps()
+                        } label: {
+                            HStack {
+                                Image(systemName: "map.fill")
+                                Text("Open in Apple Maps")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                    }
+                    .padding(.horizontal)
+
                     // Description
                     if let description = place.descriptionText, !description.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Description")
                                 .font(.headline)
-                            
+
                             Text(description)
                                 .font(.body)
                         }
@@ -206,6 +259,36 @@ struct PlaceDetailView: View {
                 self.authorName = recordID.recordName
             }
         }
+    }
+
+    private func openInAppleMaps() {
+        // Use stored identifier to open the actual POI
+        guard let identifierString = place.mapItemIdentifier,
+              let identifier = MKMapItem.Identifier(rawValue: identifierString) else {
+            openWithCoordinates()
+            return
+        }
+
+        Task {
+            do {
+                let request = MKMapItemRequest(mapItemIdentifier: identifier)
+                let mapItem = try await request.mapItem
+                await MainActor.run {
+                    mapItem.openInMaps()
+                }
+            } catch {
+                // Fallback if fetching fails
+                await MainActor.run {
+                    openWithCoordinates()
+                }
+            }
+        }
+    }
+
+    private func openWithCoordinates() {
+        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
+        mapItem.name = place.name
+        mapItem.openInMaps()
     }
 }
 

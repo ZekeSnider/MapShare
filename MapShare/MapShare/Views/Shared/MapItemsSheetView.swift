@@ -4,7 +4,6 @@ import CoreLocation
 struct MapItemsListView: View {
     let document: Document
     @Binding var selectedPlace: Place?
-    @Binding var selectedNote: Note?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,39 +38,13 @@ struct MapItemsListView: View {
                                 isSelected: selectedPlace?.id == place.id,
                                 onTap: {
                                     selectedPlace = place
-                                    selectedNote = nil
                                 }
                             )
-                        }
-                    }
-
-                    // Notes
-                    if !document.notesArray.isEmpty {
-                        SectionHeader(title: "Notes", count: document.notesArray.count)
-
-                        ForEach(document.notesArray, id: \.id) { note in
-                            NoteRowView(
-                                note: note,
-                                isSelected: selectedNote?.id == note.id,
-                                onTap: {
-                                    selectedNote = note
-                                    selectedPlace = nil
-                                }
-                            )
-                        }
-                    }
-
-                    // Shapes
-                    if !document.shapesArray.isEmpty {
-                        SectionHeader(title: "Emojis", count: document.shapesArray.count)
-
-                        ForEach(document.shapesArray, id: \.id) { shape in
-                            ShapeRowView(shape: shape)
                         }
                     }
 
                     // Empty state
-                    if document.placesArray.isEmpty && document.notesArray.isEmpty && document.shapesArray.isEmpty {
+                    if document.placesArray.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "map")
                                 .font(.system(size: 40))
@@ -79,7 +52,7 @@ struct MapItemsListView: View {
                             Text("No items yet")
                                 .font(.headline)
                                 .foregroundColor(.secondary)
-                            Text("Tap + to add places, notes, or emojis")
+                            Text("Tap + to add places")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -87,12 +60,20 @@ struct MapItemsListView: View {
                         .padding(.vertical, 40)
                     }
                 }
-                .padding(.bottom, 20)
             }
+            .contentMargins(.bottom, 34, for: .scrollContent)
         }
         .frame(maxWidth: .infinity)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 16,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 16,
+                style: .continuous
+            )
+        )
         .shadow(color: .black.opacity(0.15), radius: 8, y: -2)
     }
 }
@@ -172,65 +153,5 @@ struct PlaceRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-struct NoteRowView: View {
-    let note: Note
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.black.opacity(0.6))
-                        .frame(width: 36, height: 36)
-
-                    Image(systemName: "note.text")
-                        .font(.system(size: 16))
-                        .foregroundColor(.yellow)
-                }
-
-                Text(note.content ?? "Empty note")
-                    .font(.body)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.blue)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct ShapeRowView: View {
-    let shape: Shape
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(shape.emoji ?? "❓")
-                .font(.system(size: 28))
-                .frame(width: 36, height: 36)
-
-            Text("Emoji")
-                .font(.body)
-                .foregroundColor(.primary)
-
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 10)
-        .contentShape(Rectangle())
     }
 }
