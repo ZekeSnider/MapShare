@@ -11,7 +11,7 @@ struct FilterSettings {
 }
 
 struct DocumentDetailView: View {
-    let document: Document
+    var document: Document
     @State private var showingAddPlace = false
     @State private var showingAddNote = false
     @State private var showingAddShape = false
@@ -20,6 +20,7 @@ struct DocumentDetailView: View {
     @State private var showingShareDocument = false
     @State private var filterSettings = FilterSettings()
     @State private var panelExpanded = false
+    @State private var refreshID = UUID()
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
@@ -144,7 +145,7 @@ struct DocumentDetailView: View {
             }
         }
         .sheet(isPresented: $showingAddPlace) {
-            AddPlaceView(document: document, isPresented: $showingAddPlace)
+            PlaceSearchView(document: document, isPresented: $showingAddPlace)
         }
         .sheet(isPresented: $showingAddNote) {
             AddNoteView(document: document, isPresented: $showingAddNote, coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194))
@@ -161,6 +162,10 @@ struct DocumentDetailView: View {
         .sheet(isPresented: $showingShareDocument) {
             DocumentShareView(document: document, isPresented: $showingShareDocument)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+            refreshID = UUID()
+        }
+        .id(refreshID)
     }
 
     private func addSampleRoute() {
