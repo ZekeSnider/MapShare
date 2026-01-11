@@ -1,144 +1,25 @@
 import SwiftUI
 import CoreLocation
 
-enum PanelHeight: CaseIterable {
-    case small
-    case medium
-    case large
-
-    var fraction: CGFloat {
-        switch self {
-        case .small: return 0.15
-        case .medium: return 0.4
-        case .large: return 0.85
-        }
-    }
-}
-
-struct BottomPanelView<Content: View>: View {
-    @Binding var currentHeight: PanelHeight
-    let content: Content
-
-    @GestureState private var dragOffset: CGFloat = 0
-
-    init(currentHeight: Binding<PanelHeight>, @ViewBuilder content: () -> Content) {
-        self._currentHeight = currentHeight
-        self.content = content()
-    }
-
-    var body: some View {
-        GeometryReader { geometry in
-            let maxHeight = geometry.size.height
-            let targetHeight = maxHeight * currentHeight.fraction
-            let draggedHeight = targetHeight - dragOffset
-
-            VStack(spacing: 0) {
-                Spacer()
-
-                VStack(spacing: 0) {
-                    // Drag handle
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.5))
-                        .frame(width: 36, height: 5)
-                        .padding(.top, 8)
-                        .padding(.bottom, 8)
-
-                    content
-                }
-                .frame(height: max(60, draggedHeight))
-                .frame(maxWidth: .infinity)
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: .black.opacity(0.15), radius: 8, y: -2)
-                .gesture(
-                    DragGesture()
-                        .updating($dragOffset) { value, state, _ in
-                            state = value.translation.height
-                        }
-                        .onEnded { value in
-                            let velocity = value.predictedEndTranslation.height - value.translation.height
-                            let currentFraction = (targetHeight - value.translation.height) / maxHeight
-
-                            // Determine target based on position and velocity
-                            if velocity > 100 {
-                                // Swiping down fast
-                                switch currentHeight {
-                                case .large: currentHeight = .medium
-                                case .medium: currentHeight = .small
-                                case .small: break
-                                }
-                            } else if velocity < -100 {
-                                // Swiping up fast
-                                switch currentHeight {
-                                case .small: currentHeight = .medium
-                                case .medium: currentHeight = .large
-                                case .large: break
-                                }
-                            } else {
-                                // Snap to nearest
-                                let heights = PanelHeight.allCases
-                                var closest = currentHeight
-                                var minDistance: CGFloat = .infinity
-                                for height in heights {
-                                    let distance = abs(currentFraction - height.fraction)
-                                    if distance < minDistance {
-                                        minDistance = distance
-                                        closest = height
-                                    }
-                                }
-                                currentHeight = closest
-                            }
-                        }
-                )
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: currentHeight)
-            }
-        }
-        .edgesIgnoringSafeArea(.bottom)
-    }
-}
-
 struct MapItemsListView: View {
     let document: Document
     @Binding var selectedPlace: Place?
     @Binding var selectedNote: Note?
-    @Binding var selectedShape: Shape?
-    @Binding var showingAddPlace: Bool
-    @Binding var showingAddNote: Bool
-    @Binding var showingAddShape: Bool
-    let onCenterOnItem: (CLLocationCoordinate2D) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with Add menu
+            // Drag handle
+            Capsule()
+                .fill(Color.secondary.opacity(0.5))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            // Header
             HStack {
                 Text("Map Items")
                     .font(.headline)
-
                 Spacer()
-
-                Menu {
-                    Button {
-                        showingAddPlace = true
-                    } label: {
-                        Label("Add Place", systemImage: "mappin.circle.fill")
-                    }
-
-                    Button {
-                        showingAddNote = true
-                    } label: {
-                        Label("Add Note", systemImage: "note.text.badge.plus")
-                    }
-
-                    Button {
-                        showingAddShape = true
-                    } label: {
-                        Label("Add Emoji", systemImage: "face.smiling")
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                }
             }
             .padding(.horizontal)
             .padding(.bottom, 8)
@@ -159,8 +40,6 @@ struct MapItemsListView: View {
                                 onTap: {
                                     selectedPlace = place
                                     selectedNote = nil
-                                    selectedShape = nil
-                                    onCenterOnItem(place.coordinate)
                                 }
                             )
                         }
@@ -177,8 +56,6 @@ struct MapItemsListView: View {
                                 onTap: {
                                     selectedNote = note
                                     selectedPlace = nil
-                                    selectedShape = nil
-                                    onCenterOnItem(note.coordinate)
                                 }
                             )
                         }
@@ -189,16 +66,7 @@ struct MapItemsListView: View {
                         SectionHeader(title: "Emojis", count: document.shapesArray.count)
 
                         ForEach(document.shapesArray, id: \.id) { shape in
-                            ShapeRowView(
-                                shape: shape,
-                                isSelected: selectedShape?.id == shape.id,
-                                onTap: {
-                                    selectedShape = shape
-                                    selectedPlace = nil
-                                    selectedNote = nil
-                                    onCenterOnItem(shape.coordinate)
-                                }
-                            )
+                            ShapeRowView(shape: shape)
                         }
                     }
 
@@ -222,6 +90,10 @@ struct MapItemsListView: View {
                 .padding(.bottom, 20)
             }
         }
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: 8, y: -2)
     }
 }
 
@@ -344,32 +216,21 @@ struct NoteRowView: View {
 
 struct ShapeRowView: View {
     let shape: Shape
-    let isSelected: Bool
-    let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                Text(shape.emoji ?? "❓")
-                    .font(.system(size: 28))
-                    .frame(width: 36, height: 36)
+        HStack(spacing: 12) {
+            Text(shape.emoji ?? "❓")
+                .font(.system(size: 28))
+                .frame(width: 36, height: 36)
 
-                Text("Emoji")
-                    .font(.body)
-                    .foregroundColor(.primary)
+            Text("Emoji")
+                .font(.body)
+                .foregroundColor(.primary)
 
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.blue)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-            .contentShape(Rectangle())
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 }
