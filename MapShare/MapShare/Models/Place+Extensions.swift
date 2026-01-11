@@ -37,8 +37,24 @@ extension Place: MKAnnotation {
     var thumbsUpCount: Int {
         reactionsArray.filter { $0.type == "thumbsUp" }.count
     }
-    
+
     var thumbsDownCount: Int {
         reactionsArray.filter { $0.type == "thumbsDown" }.count
+    }
+
+    var thumbsUpReactions: [Reaction] {
+        reactionsArray.filter { $0.type == "thumbsUp" }
+    }
+
+    var thumbsDownReactions: [Reaction] {
+        reactionsArray.filter { $0.type == "thumbsDown" }
+    }
+
+    func userReaction(for authorName: String) -> Reaction? {
+        reactionsArray.first { $0.authorName == authorName }
+    }
+
+    func hasUserReacted(_ authorName: String, type: String) -> Bool {
+        reactionsArray.contains { $0.authorName == authorName && $0.type == type }
     }
 }

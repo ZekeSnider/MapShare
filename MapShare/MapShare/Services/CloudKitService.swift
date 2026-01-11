@@ -61,6 +61,20 @@ class CloudKitService {
             return nil
         }
     }
+
+    func getCurrentUserDisplayName() async -> String? {
+        do {
+            let recordID = try await CKContainer.default().userRecordID()
+            let identity = try await CKContainer.default().userIdentity(forUserRecordID: recordID)
+            if let nameComponents = identity?.nameComponents {
+                return PersonNameComponentsFormatter.localizedString(from: nameComponents, style: .short)
+            }
+            return nil
+        } catch {
+            print("Failed to fetch user identity: \(error)")
+            return nil
+        }
+    }
     
     // MARK: - User Presence
     

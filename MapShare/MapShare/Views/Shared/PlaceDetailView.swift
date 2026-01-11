@@ -5,6 +5,7 @@ internal import CloudKit
 
 struct PlaceDetailView: View {
     let place: Place
+    @State private var refreshID = UUID()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
     @State private var showingEditView = false
@@ -126,33 +127,40 @@ struct PlaceDetailView: View {
                     }
                     
                     // Reactions
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Reactions")
                             .font(.headline)
-                        
-                        HStack {
-                            Spacer()
-                            
-                            HStack {
-                                Button(action: { addReaction("thumbsUp") }) {
-                                    HStack {
-                                        Image(systemName: "hand.thumbsup")
-                                        Text("\(place.thumbsUpCount)")
-                                    }
-                                    .foregroundColor(.green)
-                                }
-                                
-                                Button(action: { addReaction("thumbsDown") }) {
-                                    HStack {
-                                        Image(systemName: "hand.thumbsdown")
-                                        Text("\(place.thumbsDownCount)")
-                                    }
-                                    .foregroundColor(.red)
-                                }
+
+                        HStack(spacing: 16) {
+                            // Thumbs Up
+                            ReactionButton(
+                                icon: "hand.thumbsup",
+                                filledIcon: "hand.thumbsup.fill",
+                                count: place.thumbsUpCount,
+                                reactions: place.thumbsUpReactions,
+                                isSelected: place.hasUserReacted(authorName, type: "thumbsUp"),
+                                color: .green
+                            ) {
+                                toggleReaction("thumbsUp")
                             }
+
+                            // Thumbs Down
+                            ReactionButton(
+                                icon: "hand.thumbsdown",
+                                filledIcon: "hand.thumbsdown.fill",
+                                count: place.thumbsDownCount,
+                                reactions: place.thumbsDownReactions,
+                                isSelected: place.hasUserReacted(authorName, type: "thumbsDown"),
+                                color: .red
+                            ) {
+                                toggleReaction("thumbsDown")
+                            }
+
+                            Spacer()
                         }
                     }
                     .padding(.horizontal)
+                    .id(refreshID)
                     
                     // Comments section
                     VStack(alignment: .leading, spacing: 8) {
@@ -214,16 +222,29 @@ struct PlaceDetailView: View {
     @State private var authorName: String = "Anonymous"
     @State private var newCommentContent: String = ""
 
-    private func addReaction(_ type: String) {
+    private func toggleReaction(_ type: String) {
         withAnimation {
-            let reaction = Reaction(context: viewContext)
-            reaction.id = UUID()
-            reaction.type = type
-            reaction.authorName = authorName
-            reaction.place = place
-            
+            // Check if user already has a reaction
+            if let existingReaction = place.userReaction(for: authorName) {
+                if existingReaction.type == type {
+                    // Same type - remove the reaction (toggle off)
+                    viewContext.delete(existingReaction)
+                } else {
+                    // Different type - change the reaction
+                    existingReaction.type = type
+                }
+            } else {
+                // No existing reaction - add new one
+                let reaction = Reaction(context: viewContext)
+                reaction.id = UUID()
+                reaction.type = type
+                reaction.authorName = authorName
+                reaction.place = place
+            }
+
             do {
                 try viewContext.save()
+                refreshID = UUID()
             } catch {
                 let nsError = error as NSError
                 print("Failed to save reaction: \(nsError), \(nsError.userInfo)")
@@ -253,9 +274,9 @@ struct PlaceDetailView: View {
     
     private func fetchUserName() {
         Task {
-            if let recordID = await CloudKitService.shared.getCurrentUserRecordID() {
-                // For this example, we're just using the record name.
-                // In a real app, you might fetch the user's actual name from their contacts.
+            if let displayName = await CloudKitService.shared.getCurrentUserDisplayName() {
+                self.authorName = displayName
+            } else if let recordID = await CloudKitService.shared.getCurrentUserRecordID() {
                 self.authorName = recordID.recordName
             }
         }
@@ -294,25 +315,87 @@ struct PlaceDetailView: View {
 
 struct CommentRowView: View {
     let comment: Comment
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(comment.authorName ?? "Unknown")
                     .font(.caption)
                     .bold()
-                
+
                 Spacer()
-                
+
                 Text(comment.createdDate ?? Date(), style: .relative)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Text(comment.content ?? "")
                 .font(.body)
         }
         .padding(.vertical, 4)
+    }
+}
+
+struct ReactionButton: View {
+    let icon: String
+    let filledIcon: String
+    let count: Int
+    let reactions: [Reaction]
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: isSelected ? filledIcon : icon)
+                        .font(.system(size: 20))
+                    Text("\(count)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(isSelected ? color : .secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? color.opacity(0.15) : Color.secondary.opacity(0.1))
+                )
+
+                // Show who reacted (like iMessage tapbacks)
+                if !reactions.isEmpty {
+                    Text(reactionNames)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var reactionNames: String {
+        let names = reactions.compactMap { reaction -> String? in
+            guard let authorName = reaction.authorName else { return nil }
+            // Shorten CloudKit record names for display
+            if authorName.hasPrefix("_") {
+                return String(authorName.prefix(8)) + "..."
+            }
+            return authorName
+        }
+
+        switch names.count {
+        case 0:
+            return ""
+        case 1:
+            return names[0]
+        case 2:
+            return "\(names[0]) & \(names[1])"
+        default:
+            return "\(names[0]) & \(names.count - 1) more"
+        }
     }
 }
 
