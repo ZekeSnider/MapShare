@@ -13,9 +13,26 @@ struct MapView: View {
     var body: some View {
         Map(coordinateRegion: $region, annotationItems: document.placesArray) { place in
             MapAnnotation(coordinate: place.coordinate) {
-                PlaceAnnotationView(place: place) {
-                    selectedPlace = place
+                Button(action: { selectedPlace = place }) {
+                    VStack {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: place.iconColor ?? "#FF3B30"))
+                                .frame(width: 30, height: 30)
+                            
+                            Image(systemName: place.iconName ?? "mappin")
+                                .foregroundColor(.white)
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        
+                        Text(place.name ?? "")
+                            .font(.caption)
+                            .padding(4)
+                            .background(Color.white.opacity(0.8))
+                            .cornerRadius(4)
+                    }
                 }
+                .buttonStyle(PlainButtonStyle())
             }
         }
         .onAppear {
@@ -43,34 +60,6 @@ struct MapView: View {
             center: CLLocationCoordinate2D(latitude: centerLatitude, longitude: centerLongitude),
             span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
         )
-    }
-}
-
-struct PlaceAnnotationView: View {
-    let place: Place
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            VStack {
-                ZStack {
-                    Circle()
-                        .fill(Color(hex: place.iconColor ?? "#FF3B30"))
-                        .frame(width: 30, height: 30)
-                    
-                    Image(systemName: place.iconName ?? "mappin")
-                        .foregroundColor(.white)
-                        .font(.system(size: 16, weight: .medium))
-                }
-                
-                Text(place.name ?? "")
-                    .font(.caption)
-                    .padding(4)
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(4)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -102,6 +91,9 @@ extension Color {
 }
 
 #Preview {
-    MapView(document: PersistenceController.preview.container.viewContext.registeredObjects.compactMap { $0 as? Document }.first!, selectedPlace: .constant(nil))
-        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    let context = PersistenceController.preview.container.viewContext
+    let document = Document(name: "Sample Document", context: context)
+    
+    return MapView(document: document, selectedPlace: .constant(nil))
+        .environment(\.managedObjectContext, context)
 }
