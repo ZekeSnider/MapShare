@@ -6,102 +6,31 @@ struct MapItemsListView: View {
     @Binding var selectedPlace: Place?
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Drag handle
-            Capsule()
-                .fill(Color.secondary.opacity(0.5))
-                .frame(width: 36, height: 5)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-
-            // Header
-            HStack {
-                Text("Map Items")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            // Items list
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    // Places
-                    if !document.placesArray.isEmpty {
-                        ForEach(document.placesArray, id: \.id) { place in
-                            PlaceRowView(
-                                place: place,
-                                isSelected: selectedPlace?.id == place.id,
-                                onTap: {
-                                    selectedPlace = place
-                                }
-                            )
-                        }
+        NavigationStack {
+            List {
+                if document.placesArray.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Places", systemImage: "map")
+                    } description: {
+                        Text("Tap + to add places to this map")
                     }
-
-                    // Empty state
-                    if document.placesArray.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "map")
-                                .font(.system(size: 40))
-                                .foregroundColor(.secondary)
-                            Text("No items yet")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            Text("Tap + to add places")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                } else {
+                    ForEach(document.placesArray, id: \.id) { place in
+                        PlaceRowView(
+                            place: place,
+                            isSelected: selectedPlace?.id == place.id,
+                            onTap: {
+                                selectedPlace = place
+                            }
+                        )
+                        .listRowInsets(EdgeInsets())
                     }
                 }
             }
-            .contentMargins(.bottom, 34, for: .scrollContent)
+            .listStyle(.plain)
+            .navigationTitle("Map Items")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .frame(maxWidth: .infinity)
-        .background(.regularMaterial)
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 16,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 16,
-                style: .continuous
-            )
-        )
-        .shadow(color: .black.opacity(0.15), radius: 8, y: -2)
-    }
-}
-
-// MARK: - Section Header
-
-struct SectionHeader: View {
-    let title: String
-    let count: Int
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-
-            Text("\(count)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.secondary.opacity(0.2))
-                .clipShape(Capsule())
-
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
     }
 }
 

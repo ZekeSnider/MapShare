@@ -12,114 +12,83 @@ struct DocumentDetailView: View {
     @State private var selectedPlace: Place?
     @State private var showingShareDocument = false
     @State private var filterSettings = FilterSettings()
-    @State private var panelExpanded = false
+    @State private var selectedDetent: PresentationDetent = .fraction(0.15)
     @State private var refreshID = UUID()
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                // Map
-                MapView(document: document, selectedPlace: $selectedPlace, filter: filterSettings)
-                    .ignoresSafeArea(edges: .bottom)
-
-                // Sharing info overlay
-                VStack {
+        MapView(document: document, selectedPlace: $selectedPlace, filter: filterSettings)
+            .ignoresSafeArea()
+            .overlay(alignment: .top) {
+                if document.isShared {
                     HStack {
                         Spacer()
-
-                        if document.isShared {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.2.fill")
-                                    .foregroundColor(.blue)
-
-                                Text("Shared")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-
-                                Button("Manage") {
-                                    showingShareDocument = true
-                                }
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.2.fill")
+                                .foregroundColor(.blue)
+                            Text("Shared")
                                 .font(.caption)
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
+                                .foregroundColor(.secondary)
+                            Button("Manage") {
+                                showingShareDocument = true
                             }
-                            .padding()
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                            .shadow(radius: 2)
-                            .padding(.trailing)
+                            .font(.caption)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                         }
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 2)
+                        .padding(.trailing)
                     }
-                    Spacer()
+                    .padding(.top, 8)
                 }
-
-                // Bottom panel
-                MapItemsListView(
-                    document: document,
-                    selectedPlace: $selectedPlace
-                )
-                .frame(height: (panelExpanded ? geometry.size.height * 0.6 : 200) + geometry.safeAreaInsets.bottom)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: panelExpanded)
-                .gesture(
-                    DragGesture()
-                        .onEnded { value in
-                            if value.translation.height < -50 {
-                                panelExpanded = true
-                            } else if value.translation.height > 50 {
-                                panelExpanded = false
-                            }
-                        }
-                )
             }
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .navigationTitle(document.name ?? "Untitled")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack {
-                    // Add menu with plus button
-                    Menu {
+            .navigationTitle(document.name ?? "Untitled")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack {
                         Button(action: { showingAddPlace = true }) {
-                            Label("Add Place", systemImage: "mappin.circle.fill")
+                            Image(systemName: "plus")
                         }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-
-                    // More options menu
-                    Menu {
-                        Button(action: { showingShareDocument = true }) {
-                            Label("Share Document", systemImage: "square.and.arrow.up")
+                        Menu {
+                            Button(action: { showingShareDocument = true }) {
+                                Label("Share Document", systemImage: "square.and.arrow.up")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-
-                    // Filter menu
-                    Menu {
-                        Toggle(isOn: $filterSettings.showPlaces) {
-                            Label("Places", systemImage: "mappin")
+                        Menu {
+                            Toggle(isOn: $filterSettings.showPlaces) {
+                                Label("Places", systemImage: "mappin")
+                            }
+                        } label: {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
                         }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
                     }
                 }
             }
-        }
-        .sheet(isPresented: $showingAddPlace) {
-            PlaceSearchView(document: document, isPresented: $showingAddPlace)
-        }
-        .sheet(item: $selectedPlace) { place in
-            PlaceDetailView(place: place)
-        }
-        .sheet(isPresented: $showingShareDocument) {
-            DocumentShareView(document: document, isPresented: $showingShareDocument)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
-            refreshID = UUID()
-        }
-        .id(refreshID)
+            .sheet(isPresented: $showingAddPlace) {
+                PlaceSearchView(document: document, isPresented: $showingAddPlace)
+            }
+            .sheet(isPresented: $showingShareDocument) {
+                DocumentShareView(document: document, isPresented: $showingShareDocument)
+            }
+            .sheet(item: $selectedPlace) { place in
+                PlaceDetailView(place: place)
+            }
+            .sheet(isPresented: .constant(true)) {
+                MapItemsListView(document: document, selectedPlace: $selectedPlace)
+                    .presentationDetents([.fraction(0.15), .medium, .large], selection: $selectedDetent)
+                    .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .large))
+                    .interactiveDismissDisabled()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
+                refreshID = UUID()
+            }
+            .id(refreshID)
     }
 }
 

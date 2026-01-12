@@ -125,7 +125,7 @@ class CloudKitService {
         return await MainActor.run {
             return Participant.findOrCreate(
                 cloudKitRecordID: recordID.recordName,
-                givenName: nameComponents?.givenName,
+                givenName: nameComponents?.givenName ?? "Me",
                 familyName: nameComponents?.familyName,
                 email: lookupInfo?.emailAddress,
                 phoneNumber: lookupInfo?.phoneNumber,
