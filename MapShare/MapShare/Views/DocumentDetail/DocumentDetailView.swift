@@ -13,6 +13,7 @@ struct DocumentDetailView: View {
     @State private var showingShareDocument = false
     @State private var filterSettings = FilterSettings()
     @State private var selectedDetent: PresentationDetent = .fraction(0.15)
+    @State private var showingItemsList = false
     @State private var refreshID = UUID()
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -78,12 +79,15 @@ struct DocumentDetailView: View {
             .sheet(item: $selectedPlace) { place in
                 PlaceDetailView(place: place)
             }
-            .sheet(isPresented: .constant(true)) {
+            .sheet(isPresented: $showingItemsList) {
                 MapItemsListView(document: document, selectedPlace: $selectedPlace)
                     .presentationDetents([.fraction(0.15), .medium, .large], selection: $selectedDetent)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))
                     .interactiveDismissDisabled()
+            }
+            .onAppear {
+                showingItemsList = true
             }
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
                 refreshID = UUID()
