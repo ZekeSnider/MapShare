@@ -12,9 +12,22 @@
 		B4DAA5C42F134266004637D3 /* MapShare.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = MapShare.xcodeproj; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B441D07E2F14797000DE18F6 /* Exceptions for "MapShare" folder in "MapShare" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B420F9A32F13420F00AC9C47 /* MapShare */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B420F9A62F13420F00AC9C47 /* MapShare */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B441D07E2F14797000DE18F6 /* Exceptions for "MapShare" folder in "MapShare" target */,
+			);
 			path = MapShare;
 			sourceTree = "<group>";
 		};
@@ -279,6 +292,7 @@
 				DEVELOPMENT_TEAM = C7LJ587XF3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MapShare/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -312,6 +326,7 @@
 				DEVELOPMENT_TEAM = C7LJ587XF3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MapShare/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

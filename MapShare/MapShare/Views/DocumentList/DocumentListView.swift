@@ -11,6 +11,7 @@ struct DocumentListView: View {
     @State private var showingAddDocument = false
     @State private var selectedDocument: Document?
     @State private var showingShareDocument = false
+    @State private var newDocumentName = ""
     
     var body: some View {
         NavigationView {
@@ -74,11 +75,7 @@ struct DocumentListView: View {
                 NavigationView {
                     Form {
                         Section(header: Text("Document Details")) {
-                            TextField("Name", text: Binding(
-                                get: { "" },
-                                set: { _ in }
-                            ))
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            TextField("Name", text: $newDocumentName)
                         }
                     }
                     .navigationTitle("New Map")
@@ -86,14 +83,15 @@ struct DocumentListView: View {
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
                             Button("Cancel") {
+                                newDocumentName = ""
                                 showingAddDocument = false
                             }
                         }
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("Save") {
-                                // Add document logic here
-                                showingAddDocument = false
+                                addDocument()
                             }
+                            .disabled(newDocumentName.isEmpty)
                         }
                     }
                 }
@@ -106,6 +104,21 @@ struct DocumentListView: View {
         }
     }
     
+    private func addDocument() {
+        withAnimation {
+            let newDocument = Document(name: newDocumentName, context: viewContext)
+
+            do {
+                try viewContext.save()
+                newDocumentName = ""
+                showingAddDocument = false
+            } catch {
+                let nsError = error as NSError
+                print("Failed to create document: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+
     private func shareDocument(_ document: Document) {
         selectedDocument = document
         showingShareDocument = true

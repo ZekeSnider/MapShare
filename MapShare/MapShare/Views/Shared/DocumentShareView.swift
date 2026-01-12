@@ -5,22 +5,48 @@ internal import CloudKit
 struct DocumentShareView: View {
     let document: Document
     @Binding var isPresented: Bool
-    
+    @Environment(\.managedObjectContext) private var viewContext
+
     @State private var share: CKShare?
     @State private var isLoading = true
-    
+    @State private var errorMessage: String?
+
     var body: some View {
         Group {
             if isLoading {
-                VStack {
+                VStack(spacing: 12) {
                     ProgressView()
                     Text("Preparing share...")
+                    Text("Syncing to iCloud...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text("Could not share")
+                        .font(.headline)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Close") {
+                        isPresented = false
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
             } else if let share = share {
-                CloudSharingView(share: share, container: CKContainer.default(), document: document)
+                CloudSharingView(share: share, container: CKContainer(identifier: CloudKitConfig.containerIdentifier), document: document)
             } else {
-                VStack {
-                    Text("Could not create or fetch share.")
+                VStack(spacing: 16) {
+                    Text("Could not create share.")
+                    Button("Try Again") {
+                        loadShare()
+                    }
+                    .buttonStyle(.borderedProminent)
                     Button("Close") {
                         isPresented = false
                     }
@@ -29,22 +55,42 @@ struct DocumentShareView: View {
         }
         .onAppear(perform: loadShare)
     }
-    
+
     private func loadShare() {
-        Task {
+        Task { @MainActor in
             isLoading = true
-            
-            // Check if a share already exists
-            let existingShare = await CloudKitService.shared.getShare(for: document)
-            
-            if let existingShare = existingShare {
-                self.share = existingShare
-            } else {
-                // If not, create a new share
-                await CloudKitService.shared.shareDocument(document)
-                self.share = await CloudKitService.shared.getShare(for: document)
+            errorMessage = nil
+
+            // First, make sure the document is saved
+            if viewContext.hasChanges {
+                do {
+                    try viewContext.save()
+                } catch {
+                    errorMessage = "Failed to save document: \(error.localizedDescription)"
+                    isLoading = false
+                    return
+                }
             }
-            
+
+            // Check if a share already exists
+            do {
+                if let existingShare = await CloudKitService.shared.getShare(for: document) {
+                    print("Found existing share: \(existingShare)")
+                    self.share = existingShare
+                    isLoading = false
+                    return
+                }
+            }
+
+            // If not, create a new share
+            print("Creating new share for document: \(document.name ?? "unnamed")")
+            if let newShare = await CloudKitService.shared.createShare(for: document) {
+                print("Share created successfully: \(newShare)")
+                self.share = newShare
+            } else {
+                errorMessage = "Failed to create share. Make sure the document is synced to iCloud."
+            }
+
             isLoading = false
         }
     }

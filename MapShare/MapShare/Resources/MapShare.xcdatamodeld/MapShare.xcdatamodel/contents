@@ -16,6 +16,15 @@
         <attribute name="shareMetadata" optional="YES" attributeType="Binary"/>
         <relationship name="places" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Place" inverseName="document" inverseEntity="Place"/>
     </entity>
+    <entity name="Participant" representedClassName="Participant" syncable="YES" codeGenerationType="class">
+        <attribute name="cloudKitRecordID" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="familyName" optional="YES" attributeType="String"/>
+        <attribute name="givenName" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="phoneNumber" optional="YES" attributeType="String"/>
+        <relationship name="placesAdded" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Place" inverseName="addedBy" inverseEntity="Place"/>
+    </entity>
     <entity name="Place" representedClassName="Place" syncable="YES" codeGenerationType="class">
         <attribute name="address" optional="YES" attributeType="String"/>
         <attribute name="createdDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -30,6 +39,7 @@
         <attribute name="name" optional="YES" attributeType="String"/>
         <attribute name="phoneNumber" optional="YES" attributeType="String"/>
         <attribute name="websiteURL" optional="YES" attributeType="URI"/>
+        <relationship name="addedBy" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Participant" inverseName="placesAdded" inverseEntity="Participant"/>
         <relationship name="comments" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Comment" inverseName="place" inverseEntity="Comment"/>
         <relationship name="document" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Document" inverseName="places" inverseEntity="Document"/>
         <relationship name="reactions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Reaction" inverseName="place" inverseEntity="Reaction"/>

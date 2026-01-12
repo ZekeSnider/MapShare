@@ -290,6 +290,7 @@ struct AddPlaceViewEmbedded: View {
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
     )
+    @State private var currentUserParticipant: Participant?
 
     private let iconOptions = ["mappin", "house", "building.2", "car", "fork.knife", "cup.and.saucer", "cart", "bag", "heart", "star"]
     private let colorOptions = ["#FF3B30", "#FF9500", "#FFCC02", "#34C759", "#007AFF", "#5856D6", "#AF52DE", "#FF2D92"]
@@ -410,6 +411,9 @@ struct AddPlaceViewEmbedded: View {
                 )
             }
         }
+        .task {
+            currentUserParticipant = await CloudKitService.shared.getCurrentUserAsParticipant(in: viewContext)
+        }
     }
 
     private func addPlace() {
@@ -425,6 +429,7 @@ struct AddPlaceViewEmbedded: View {
             newPlace.phoneNumber = prefilledPhoneNumber
             newPlace.websiteURL = prefilledWebsiteURL
             newPlace.mapItemIdentifier = prefilledMapItemIdentifier
+            newPlace.addedBy = currentUserParticipant
 
             do {
                 try viewContext.save()

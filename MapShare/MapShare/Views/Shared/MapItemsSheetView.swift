@@ -30,8 +30,6 @@ struct MapItemsListView: View {
                 LazyVStack(spacing: 0) {
                     // Places
                     if !document.placesArray.isEmpty {
-                        SectionHeader(title: "Places", count: document.placesArray.count)
-
                         ForEach(document.placesArray, id: \.id) { place in
                             PlaceRowView(
                                 place: place,
@@ -132,7 +130,15 @@ struct PlaceRowView: View {
                         .font(.body)
                         .foregroundColor(.primary)
 
-                    if let description = place.descriptionText, !description.isEmpty {
+                    if let addedBy = place.addedBy {
+                        HStack(spacing: 4) {
+                            ProfileAvatarView(participant: addedBy, size: 16)
+                            Text(addedBy.displayName)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    } else if let description = place.descriptionText, !description.isEmpty {
                         Text(description)
                             .font(.caption)
                             .foregroundColor(.secondary)

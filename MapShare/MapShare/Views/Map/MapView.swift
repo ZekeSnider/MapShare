@@ -6,15 +6,9 @@ struct MapView: View {
     let document: Document
     @Binding var selectedPlace: Place?
     let filter: FilterSettings
-    @State private var cloudKitService = CloudKitService.shared
 
     var body: some View {
-        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, filter: filter, userPresences: cloudKitService.userPresences)
-            .onAppear {
-                Task {
-                    await cloudKitService.observeUserPresence(for: document)
-                }
-            }
+        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, filter: filter)
     }
 }
 
@@ -22,13 +16,11 @@ struct MapViewRepresentable: UIViewRepresentable {
     let document: Document
     @Binding var selectedPlace: Place?
     let filter: FilterSettings
-    let userPresences: [String: UserPresence]
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: "place")
-        mapView.register(UserPresenceAnnotationView.self, forAnnotationViewWithReuseIdentifier: "user")
         return mapView
     }
 
@@ -38,14 +30,6 @@ struct MapViewRepresentable: UIViewRepresentable {
         var annotations: [MKAnnotation] = []
         if filter.showPlaces {
             annotations.append(contentsOf: document.placesArray as [MKAnnotation])
-        }
-
-        // Add user presences
-        for presence in userPresences {
-            if let location = presence.value.location {
-                let annotation = UserPresenceAnnotation(userID: presence.key, coordinate: location)
-                annotations.append(annotation)
-            }
         }
 
         uiView.addAnnotations(annotations)
@@ -86,10 +70,6 @@ struct MapViewRepresentable: UIViewRepresentable {
                 let view = mapView.dequeueReusableAnnotationView(withIdentifier: "place", for: annotation) as! PlaceAnnotationView
                 view.place = place
                 return view
-            } else if let user = annotation as? UserPresenceAnnotation {
-                let view = mapView.dequeueReusableAnnotationView(withIdentifier: "user", for: annotation) as! UserPresenceAnnotationView
-                view.user = user
-                return view
             }
             return nil
         }
@@ -99,36 +79,6 @@ struct MapViewRepresentable: UIViewRepresentable {
                 parent.selectedPlace = placeAnnotation
             }
         }
-    }
-}
-
-// MARK: - User Presence Annotation
-
-class UserPresenceAnnotation: NSObject, MKAnnotation {
-    let userID: String
-    let coordinate: CLLocationCoordinate2D
-
-    init(userID: String, coordinate: CLLocationCoordinate2D) {
-        self.userID = userID
-        self.coordinate = coordinate
-    }
-}
-
-class UserPresenceAnnotationView: MKAnnotationView {
-    var user: UserPresenceAnnotation?
-
-    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
-        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-
-        backgroundColor = .blue
-        frame = CGRect(x: 0, y: 0, width: 20, height: 20)
-        layer.cornerRadius = 10
-        layer.borderWidth = 2
-        layer.borderColor = UIColor.white.cgColor
-    }
-
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
     }
 }
 

@@ -1,6 +1,10 @@
 import CoreData
 internal import CloudKit
 
+enum CloudKitConfig {
+    static let containerIdentifier = "iCloud.com.zekesnider.mapshare"
+}
+
 struct PersistenceController {
     static let shared = PersistenceController()
 
@@ -41,26 +45,44 @@ struct PersistenceController {
 
     init(inMemory: Bool = false) {
         container = NSPersistentCloudKitContainer(name: "MapShare")
-        
+
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         } else {
-            // Configure CloudKit
-            let storeDescription = container.persistentStoreDescriptions.first!
-            storeDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-            storeDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
-            
-            // CloudKit configuration
-            storeDescription.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.com.mapshare.app")
+            // Get the default store description
+            guard let privateStoreDescription = container.persistentStoreDescriptions.first else {
+                fatalError("No store descriptions found")
+            }
+
+            // Configure the private store for CloudKit
+            privateStoreDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+            privateStoreDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+            let cloudKitContainerIdentifier = CloudKitConfig.containerIdentifier
+            privateStoreDescription.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: cloudKitContainerIdentifier)
+
+            // Create a shared store description for shared data
+            let sharedStoreURL = privateStoreDescription.url!.deletingLastPathComponent().appendingPathComponent("MapShare-shared.sqlite")
+            let sharedStoreDescription = NSPersistentStoreDescription(url: sharedStoreURL)
+            sharedStoreDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+            sharedStoreDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+            let sharedCloudKitOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: cloudKitContainerIdentifier)
+            sharedCloudKitOptions.databaseScope = .shared
+            sharedStoreDescription.cloudKitContainerOptions = sharedCloudKitOptions
+
+            container.persistentStoreDescriptions = [privateStoreDescription, sharedStoreDescription]
         }
-        
-        container.loadPersistentStores { _, error in
+
+        container.loadPersistentStores { storeDescription, error in
             if let error = error as NSError? {
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
+            print("Loaded store: \(storeDescription.url?.lastPathComponent ?? "unknown")")
         }
-        
+
         container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
 }
 

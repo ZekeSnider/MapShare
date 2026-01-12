@@ -20,22 +20,31 @@ struct PlaceDetailView: View {
                             Circle()
                                 .fill(Color(hex: place.iconColor ?? "#FF3B30"))
                                 .frame(width: 50, height: 50)
-                            
+
                             Image(systemName: place.iconName ?? "mappin")
                                 .foregroundColor(.white)
                                 .font(.system(size: 24, weight: .medium))
                         }
-                        
-                        VStack(alignment: .leading) {
+
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(place.name ?? "Untitled Place")
                                 .font(.title2)
                                 .bold()
-                            
-                            Text("Added \(place.createdDate ?? Date(), style: .relative) ago")
+
+                            if let addedBy = place.addedBy {
+                                HStack(spacing: 6) {
+                                    ProfileAvatarView(participant: addedBy, size: 20)
+                                    Text("Added by \(addedBy.displayName)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            Text("\(place.createdDate ?? Date(), style: .relative) ago")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         Spacer()
                     }
                     .padding(.horizontal)
@@ -138,11 +147,12 @@ struct PlaceDetailView: View {
                                 filledIcon: "hand.thumbsup.fill",
                                 count: place.thumbsUpCount,
                                 reactions: place.thumbsUpReactions,
-                                isSelected: place.hasUserReacted(authorName, type: "thumbsUp"),
+                                isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsUp"),
                                 color: .green
                             ) {
                                 toggleReaction("thumbsUp")
                             }
+                            .disabled(isLoadingUser || authorName.isEmpty)
 
                             // Thumbs Down
                             ReactionButton(
@@ -150,11 +160,12 @@ struct PlaceDetailView: View {
                                 filledIcon: "hand.thumbsdown.fill",
                                 count: place.thumbsDownCount,
                                 reactions: place.thumbsDownReactions,
-                                isSelected: place.hasUserReacted(authorName, type: "thumbsDown"),
+                                isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsDown"),
                                 color: .red
                             ) {
                                 toggleReaction("thumbsDown")
                             }
+                            .disabled(isLoadingUser || authorName.isEmpty)
 
                             Spacer()
                         }
@@ -188,7 +199,7 @@ struct PlaceDetailView: View {
                                 Text("Add Comment")
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(newCommentContent.isEmpty)
+                            .disabled(newCommentContent.isEmpty || isLoadingUser || authorName.isEmpty)
                         }
                         .padding(.vertical)
                         
@@ -197,7 +208,9 @@ struct PlaceDetailView: View {
                     
                     Spacer(minLength: 50)
                 }
-                .onAppear(perform: fetchUserName)
+                .task {
+                    await fetchUserName()
+                }
             }
             .navigationTitle("Place Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -219,8 +232,9 @@ struct PlaceDetailView: View {
         }
     }
     
-    @State private var authorName: String = "Anonymous"
+    @State private var authorName: String = ""
     @State private var newCommentContent: String = ""
+    @State private var isLoadingUser = true
 
     private func toggleReaction(_ type: String) {
         withAnimation {
@@ -272,13 +286,22 @@ struct PlaceDetailView: View {
         }
     }
     
-    private func fetchUserName() {
-        Task {
-            if let displayName = await CloudKitService.shared.getCurrentUserDisplayName() {
-                self.authorName = displayName
-            } else if let recordID = await CloudKitService.shared.getCurrentUserRecordID() {
-                self.authorName = recordID.recordName
-            }
+    private func fetchUserName() async {
+        defer { isLoadingUser = false }
+
+        // Try to get the current user as a participant (which has the name info)
+        if let participant = await CloudKitService.shared.getCurrentUserAsParticipant(in: viewContext) {
+            self.authorName = participant.displayName
+            return
+        }
+
+        // Fallback to direct CloudKit fetch
+        if let displayName = await CloudKitService.shared.getCurrentUserDisplayName() {
+            self.authorName = displayName
+        } else if let recordID = await CloudKitService.shared.getCurrentUserRecordID() {
+            self.authorName = String(recordID.recordName.prefix(8))
+        } else {
+            self.authorName = "You"
         }
     }
 
