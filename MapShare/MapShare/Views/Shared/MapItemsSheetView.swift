@@ -4,9 +4,10 @@ import CoreLocation
 struct MapItemsListView: View {
     let document: Document
     @Binding var selectedPlace: Place?
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 if document.placesArray.isEmpty {
                     ContentUnavailableView {
@@ -21,6 +22,7 @@ struct MapItemsListView: View {
                             isSelected: selectedPlace?.id == place.id,
                             onTap: {
                                 selectedPlace = place
+                                navigationPath.append(place)
                             }
                         )
                         .listRowInsets(EdgeInsets())
@@ -30,6 +32,21 @@ struct MapItemsListView: View {
             .listStyle(.plain)
             .navigationTitle("Map Items")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Place.self) { place in
+                PlaceDetailContent(place: place)
+            }
+        }
+        .onChange(of: selectedPlace) { oldValue, newValue in
+            // When map pin is tapped (selectedPlace changes externally), navigate to it
+            if let place = newValue, navigationPath.isEmpty {
+                navigationPath.append(place)
+            }
+        }
+        .onChange(of: navigationPath) { oldValue, newValue in
+            // Clear selection when navigating back to the list
+            if newValue.isEmpty && selectedPlace != nil {
+                selectedPlace = nil
+            }
         }
     }
 }

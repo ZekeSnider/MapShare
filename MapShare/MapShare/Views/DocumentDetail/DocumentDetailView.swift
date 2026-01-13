@@ -76,9 +76,6 @@ struct DocumentDetailView: View {
             .sheet(isPresented: $showingShareDocument) {
                 DocumentShareView(document: document, isPresented: $showingShareDocument)
             }
-            .sheet(item: $selectedPlace) { place in
-                PlaceDetailView(place: place)
-            }
             .sheet(isPresented: $showingItemsList) {
                 MapItemsListView(document: document, selectedPlace: $selectedPlace)
                     .presentationDetents([.fraction(0.15), .medium, .large], selection: $selectedDetent)

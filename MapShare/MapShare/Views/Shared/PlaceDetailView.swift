@@ -3,252 +3,240 @@ import MapKit
 import CoreData
 internal import CloudKit
 
-struct PlaceDetailView: View {
+// MARK: - PlaceDetailContent (for NavigationStack push)
+struct PlaceDetailContent: View {
     let place: Place
     @State private var refreshID = UUID()
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
     @State private var showingEditView = false
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Header with icon and name
-                    HStack {
-                        ZStack {
-                            Circle()
-                                .fill(Color(hex: place.iconColor ?? "#FF3B30"))
-                                .frame(width: 50, height: 50)
-
-                            Image(systemName: place.iconName ?? "mappin")
-                                .foregroundColor(.white)
-                                .font(.system(size: 24, weight: .medium))
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(place.name ?? "Untitled Place")
-                                .font(.title2)
-                                .bold()
-
-                            if let addedBy = place.addedBy {
-                                HStack(spacing: 6) {
-                                    ProfileAvatarView(participant: addedBy, size: 20)
-                                    Text("Added by \(addedBy.displayName)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-
-                            Text("\(place.createdDate ?? Date(), style: .relative) ago")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    
-                    // Map preview
-                    Map(coordinateRegion: .constant(MKCoordinateRegion(
-                        center: place.coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                    )), annotationItems: [place]) { place in
-                        MapAnnotation(coordinate: place.coordinate) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color(hex: place.iconColor ?? "#FF3B30"))
-                                    .frame(width: 30, height: 30)
-
-                                Image(systemName: place.iconName ?? "mappin")
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 16, weight: .medium))
-                            }
-                        }
-                    }
-                    .frame(height: 200)
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-
-                    // Address and Actions
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let address = place.address, !address.isEmpty {
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "location.fill")
-                                    .foregroundColor(.secondary)
-                                Text(address)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        if let phoneNumber = place.phoneNumber, !phoneNumber.isEmpty {
-                            HStack(spacing: 12) {
-                                Image(systemName: "phone.fill")
-                                    .foregroundColor(.secondary)
-                                Link(phoneNumber, destination: URL(string: "tel:\(phoneNumber.replacingOccurrences(of: " ", with: ""))")!)
-                                    .font(.subheadline)
-                            }
-                        }
-
-                        if let websiteURL = place.websiteURL {
-                            Link(destination: websiteURL) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "globe")
-                                        .foregroundColor(.secondary)
-                                    Text(websiteURL.host ?? "Website")
-                                        .font(.subheadline)
-                                        .foregroundColor(.blue)
-                                    Spacer()
-                                    Image(systemName: "arrow.up.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-
-                        Button {
-                            openInAppleMaps()
-                        } label: {
-                            HStack {
-                                Image(systemName: "map.fill")
-                                Text("Open in Apple Maps")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Description
-                    if let description = place.descriptionText, !description.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Description")
-                                .font(.headline)
-
-                            Text(description)
-                                .font(.body)
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Reactions
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Reactions")
-                            .font(.headline)
-
-                        HStack(spacing: 16) {
-                            // Thumbs Up
-                            ReactionButton(
-                                icon: "hand.thumbsup",
-                                filledIcon: "hand.thumbsup.fill",
-                                count: place.thumbsUpCount,
-                                reactions: place.thumbsUpReactions,
-                                isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsUp"),
-                                color: .green
-                            ) {
-                                toggleReaction("thumbsUp")
-                            }
-                            .disabled(isLoadingUser || authorName.isEmpty)
-
-                            // Thumbs Down
-                            ReactionButton(
-                                icon: "hand.thumbsdown",
-                                filledIcon: "hand.thumbsdown.fill",
-                                count: place.thumbsDownCount,
-                                reactions: place.thumbsDownReactions,
-                                isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsDown"),
-                                color: .red
-                            ) {
-                                toggleReaction("thumbsDown")
-                            }
-                            .disabled(isLoadingUser || authorName.isEmpty)
-
-                            Spacer()
-                        }
-                    }
-                    .padding(.horizontal)
-                    .id(refreshID)
-                    
-                    // Comments section
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Comments")
-                            .font(.headline)
-                        
-                        ForEach(place.commentsArray, id: \.id) { comment in
-                            CommentRowView(comment: comment)
-                        }
-                        
-                        if place.commentsArray.isEmpty {
-                            Text("No comments yet")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .italic()
-                        }
-                        
-                        // Add comment form
-                        VStack {
-                            TextEditor(text: $newCommentContent)
-                                .frame(height: 80)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5), lineWidth: 1))
-                            
-                            Button(action: addComment) {
-                                Text("Add Comment")
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(newCommentContent.isEmpty || isLoadingUser || authorName.isEmpty)
-                        }
-                        .padding(.vertical)
-                        
-                    }
-                    .padding(.horizontal)
-                    
-                    Spacer(minLength: 50)
-                }
-                .task {
-                    await fetchUserName()
-                }
-            }
-            .navigationTitle("Place Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Edit") {
-                        showingEditView = true
-                    }
-                }
-            }
-            .sheet(isPresented: $showingEditView) {
-                EditPlaceView(place: place, isPresented: $showingEditView)
-            }
-        }
-    }
-    
     @State private var authorName: String = ""
     @State private var newCommentContent: String = ""
     @State private var isLoadingUser = true
 
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Header with icon and name
+                HStack {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: place.iconColor ?? "#FF3B30"))
+                            .frame(width: 50, height: 50)
+
+                        Image(systemName: place.iconName ?? "mappin")
+                            .foregroundColor(.white)
+                            .font(.system(size: 24, weight: .medium))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(place.name ?? "Untitled Place")
+                            .font(.title2)
+                            .bold()
+
+                        if let addedBy = place.addedBy {
+                            HStack(spacing: 6) {
+                                ProfileAvatarView(participant: addedBy, size: 20)
+                                Text("Added by \(addedBy.displayName)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Text("\(place.createdDate ?? Date(), style: .relative) ago")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal)
+
+                // Map preview
+                Map(coordinateRegion: .constant(MKCoordinateRegion(
+                    center: place.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                )), annotationItems: [place]) { place in
+                    MapAnnotation(coordinate: place.coordinate) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: place.iconColor ?? "#FF3B30"))
+                                .frame(width: 30, height: 30)
+
+                            Image(systemName: place.iconName ?? "mappin")
+                                .foregroundColor(.white)
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                    }
+                }
+                .frame(height: 200)
+                .cornerRadius(12)
+                .padding(.horizontal)
+
+                // Address and Actions
+                VStack(alignment: .leading, spacing: 12) {
+                    if let address = place.address, !address.isEmpty {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "location.fill")
+                                .foregroundColor(.secondary)
+                            Text(address)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    if let phoneNumber = place.phoneNumber, !phoneNumber.isEmpty {
+                        HStack(spacing: 12) {
+                            Image(systemName: "phone.fill")
+                                .foregroundColor(.secondary)
+                            Link(phoneNumber, destination: URL(string: "tel:\(phoneNumber.replacingOccurrences(of: " ", with: ""))")!)
+                                .font(.subheadline)
+                        }
+                    }
+
+                    if let websiteURL = place.websiteURL {
+                        Link(destination: websiteURL) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "globe")
+                                    .foregroundColor(.secondary)
+                                Text(websiteURL.host ?? "Website")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+
+                    Button {
+                        openInAppleMaps()
+                    } label: {
+                        HStack {
+                            Image(systemName: "map.fill")
+                            Text("Open in Apple Maps")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                }
+                .padding(.horizontal)
+
+                // Description
+                if let description = place.descriptionText, !description.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Description")
+                            .font(.headline)
+
+                        Text(description)
+                            .font(.body)
+                    }
+                    .padding(.horizontal)
+                }
+
+                // Reactions
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Reactions")
+                        .font(.headline)
+
+                    HStack(spacing: 16) {
+                        // Thumbs Up
+                        ReactionButton(
+                            icon: "hand.thumbsup",
+                            filledIcon: "hand.thumbsup.fill",
+                            count: place.thumbsUpCount,
+                            reactions: place.thumbsUpReactions,
+                            isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsUp"),
+                            color: .green
+                        ) {
+                            toggleReaction("thumbsUp")
+                        }
+                        .disabled(isLoadingUser || authorName.isEmpty)
+
+                        // Thumbs Down
+                        ReactionButton(
+                            icon: "hand.thumbsdown",
+                            filledIcon: "hand.thumbsdown.fill",
+                            count: place.thumbsDownCount,
+                            reactions: place.thumbsDownReactions,
+                            isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsDown"),
+                            color: .red
+                        ) {
+                            toggleReaction("thumbsDown")
+                        }
+                        .disabled(isLoadingUser || authorName.isEmpty)
+
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal)
+                .id(refreshID)
+
+                // Comments section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Comments")
+                        .font(.headline)
+
+                    ForEach(place.commentsArray, id: \.id) { comment in
+                        CommentRowView(comment: comment)
+                    }
+
+                    if place.commentsArray.isEmpty {
+                        Text("No comments yet")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    }
+
+                    // Add comment form
+                    VStack {
+                        TextEditor(text: $newCommentContent)
+                            .frame(height: 80)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5), lineWidth: 1))
+
+                        Button(action: addComment) {
+                            Text("Add Comment")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(newCommentContent.isEmpty || isLoadingUser || authorName.isEmpty)
+                    }
+                    .padding(.vertical)
+
+                }
+                .padding(.horizontal)
+
+                Spacer(minLength: 50)
+            }
+            .task {
+                await fetchUserName()
+            }
+        }
+        .navigationTitle("Place Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Edit") {
+                    showingEditView = true
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditView) {
+            EditPlaceView(place: place, isPresented: $showingEditView)
+        }
+    }
+
     private func toggleReaction(_ type: String) {
         withAnimation {
-            // Check if user already has a reaction
             if let existingReaction = place.userReaction(for: authorName) {
                 if existingReaction.type == type {
-                    // Same type - remove the reaction (toggle off)
                     viewContext.delete(existingReaction)
                 } else {
-                    // Different type - change the reaction
                     existingReaction.type = type
                 }
             } else {
-                // No existing reaction - add new one
                 let reaction = Reaction(context: viewContext)
                 reaction.id = UUID()
                 reaction.type = type
@@ -265,7 +253,7 @@ struct PlaceDetailView: View {
             }
         }
     }
-    
+
     private func addComment() {
         guard !newCommentContent.isEmpty else { return }
         withAnimation {
@@ -275,7 +263,7 @@ struct PlaceDetailView: View {
             comment.content = newCommentContent
             comment.createdDate = Date()
             comment.place = place
-            
+
             do {
                 try viewContext.save()
                 newCommentContent = ""
@@ -285,17 +273,15 @@ struct PlaceDetailView: View {
             }
         }
     }
-    
+
     private func fetchUserName() async {
         defer { isLoadingUser = false }
 
-        // Try to get the current user as a participant (which has the name info)
         if let participant = await CloudKitService.shared.getCurrentUserAsParticipant(in: viewContext) {
             self.authorName = participant.displayName
             return
         }
 
-        // Fallback to direct CloudKit fetch
         if let displayName = await CloudKitService.shared.getCurrentUserDisplayName() {
             self.authorName = displayName
         } else if let recordID = await CloudKitService.shared.getCurrentUserRecordID() {
@@ -306,7 +292,6 @@ struct PlaceDetailView: View {
     }
 
     private func openInAppleMaps() {
-        // Use stored identifier to open the actual POI
         guard let identifierString = place.mapItemIdentifier,
               let identifier = MKMapItem.Identifier(rawValue: identifierString) else {
             openWithCoordinates()
@@ -321,7 +306,6 @@ struct PlaceDetailView: View {
                     mapItem.openInMaps()
                 }
             } catch {
-                // Fallback if fetching fails
                 await MainActor.run {
                     openWithCoordinates()
                 }
@@ -333,6 +317,25 @@ struct PlaceDetailView: View {
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
         mapItem.name = place.name
         mapItem.openInMaps()
+    }
+}
+
+// MARK: - PlaceDetailView (for sheet presentation)
+struct PlaceDetailView: View {
+    let place: Place
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            PlaceDetailContent(place: place)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Close") {
+                            dismiss()
+                        }
+                    }
+                }
+        }
     }
 }
 
