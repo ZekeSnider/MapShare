@@ -8,7 +8,6 @@ struct PlaceDetailContent: View {
     let place: Place
     @State private var refreshID = UUID()
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var showingEditView = false
     @State private var authorName: String = ""
     @State private var newCommentContent: String = ""
     @State private var isLoadingUser = true
@@ -142,7 +141,7 @@ struct PlaceDetailContent: View {
                     Text("Reactions")
                         .font(.headline)
 
-                    HStack(spacing: 16) {
+                    HStack(alignment: .top, spacing: 16) {
                         // Thumbs Up
                         ReactionButton(
                             icon: "hand.thumbsup",
@@ -150,7 +149,8 @@ struct PlaceDetailContent: View {
                             count: place.thumbsUpCount,
                             reactions: place.thumbsUpReactions,
                             isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsUp"),
-                            color: .green
+                            color: .green,
+                            reactionType: "Likes"
                         ) {
                             toggleReaction("thumbsUp")
                         }
@@ -163,7 +163,8 @@ struct PlaceDetailContent: View {
                             count: place.thumbsDownCount,
                             reactions: place.thumbsDownReactions,
                             isSelected: !authorName.isEmpty && place.hasUserReacted(authorName, type: "thumbsDown"),
-                            color: .red
+                            color: .red,
+                            reactionType: "Dislikes"
                         ) {
                             toggleReaction("thumbsDown")
                         }
@@ -218,13 +219,10 @@ struct PlaceDetailContent: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Edit") {
-                    showingEditView = true
+                NavigationLink("Edit") {
+                    EditPlaceContentView(place: place)
                 }
             }
-        }
-        .sheet(isPresented: $showingEditView) {
-            EditPlaceView(place: place, isPresented: $showingEditView)
         }
     }
 
@@ -370,7 +368,10 @@ struct ReactionButton: View {
     let reactions: [Reaction]
     let isSelected: Bool
     let color: Color
+    let reactionType: String
     let action: () -> Void
+
+    @State private var showingReactorsList = false
 
     var body: some View {
         Button(action: action) {
@@ -390,54 +391,266 @@ struct ReactionButton: View {
                         .fill(isSelected ? color.opacity(0.15) : Color.secondary.opacity(0.1))
                 )
 
-                // Show who reacted (like iMessage tapbacks)
-                if !reactions.isEmpty {
-                    Text(reactionNames)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
+                // Stacked avatars of people who reacted (always reserve space)
+                StackedAvatarsView(reactions: reactions)
             }
         }
         .buttonStyle(PlainButtonStyle())
-    }
-
-    private var reactionNames: String {
-        let names = reactions.compactMap { reaction -> String? in
-            guard let authorName = reaction.authorName else { return nil }
-            // Shorten CloudKit record names for display
-            if authorName.hasPrefix("_") {
-                return String(authorName.prefix(8)) + "..."
+        .contextMenu {
+            if !reactions.isEmpty {
+                Button {
+                    showingReactorsList = true
+                } label: {
+                    Label("See who reacted", systemImage: "person.2")
+                }
             }
-            return authorName
         }
-
-        switch names.count {
-        case 0:
-            return ""
-        case 1:
-            return names[0]
-        case 2:
-            return "\(names[0]) & \(names[1])"
-        default:
-            return "\(names[0]) & \(names.count - 1) more"
+        .sheet(isPresented: $showingReactorsList) {
+            ReactorsListView(reactions: reactions, reactionType: reactionType, color: color)
         }
     }
 }
 
-struct EditPlaceView: View {
+struct StackedAvatarsView: View {
+    let reactions: [Reaction]
+    private let maxVisibleAvatars = 3
+    private let avatarSize: CGFloat = 20
+    private let overlapOffset: CGFloat = 12
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ZStack {
+                // Invisible placeholder to always reserve height
+                Circle()
+                    .fill(Color.clear)
+                    .frame(width: avatarSize, height: avatarSize)
+
+                ForEach(Array(reactions.prefix(maxVisibleAvatars).enumerated()), id: \.element.id) { index, reaction in
+                    ReactionAvatarView(authorName: reaction.authorName ?? "?", size: avatarSize)
+                        .offset(x: CGFloat(index) * overlapOffset)
+                }
+
+                // Show overflow count if more than max visible
+                if reactions.count > maxVisibleAvatars {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.3))
+                        .frame(width: avatarSize, height: avatarSize)
+                        .overlay(
+                            Text("+\(reactions.count - maxVisibleAvatars)")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.primary)
+                        )
+                        .offset(x: CGFloat(maxVisibleAvatars) * overlapOffset)
+                }
+            }
+            .frame(width: stackWidth, alignment: .leading)
+        }
+    }
+
+    private var stackWidth: CGFloat {
+        let visibleCount = min(reactions.count, maxVisibleAvatars)
+        let hasOverflow = reactions.count > maxVisibleAvatars
+        let totalItems = visibleCount + (hasOverflow ? 1 : 0)
+        return avatarSize + CGFloat(max(0, totalItems - 1)) * overlapOffset
+    }
+}
+
+struct ReactionAvatarView: View {
+    let authorName: String
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(avatarColor)
+            .frame(width: size, height: size)
+            .overlay(
+                Text(initials)
+                    .font(.system(size: size * 0.4, weight: .medium))
+                    .foregroundColor(.white)
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color(UIColor.systemBackground), lineWidth: 1.5)
+            )
+    }
+
+    private var initials: String {
+        let components = authorName.components(separatedBy: " ")
+        if components.count >= 2 {
+            let first = components[0].first.map { String($0).uppercased() } ?? ""
+            let last = components[1].first.map { String($0).uppercased() } ?? ""
+            return "\(first)\(last)"
+        } else if let first = authorName.first {
+            return String(first).uppercased()
+        }
+        return "?"
+    }
+
+    private var avatarColor: Color {
+        let hash = authorName.hashValue
+        let colors: [Color] = [
+            Color(red: 255/255, green: 59/255, blue: 48/255),
+            Color(red: 255/255, green: 149/255, blue: 0/255),
+            Color(red: 52/255, green: 199/255, blue: 89/255),
+            Color(red: 0/255, green: 122/255, blue: 255/255),
+            Color(red: 88/255, green: 86/255, blue: 214/255),
+            Color(red: 175/255, green: 82/255, blue: 222/255),
+            Color(red: 255/255, green: 45/255, blue: 146/255),
+            Color(red: 90/255, green: 200/255, blue: 250/255),
+        ]
+        return colors[abs(hash) % colors.count]
+    }
+}
+
+struct ReactorsListView: View {
+    let reactions: [Reaction]
+    let reactionType: String
+    let color: Color
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(reactions, id: \.id) { reaction in
+                    HStack(spacing: 12) {
+                        ReactionAvatarView(authorName: reaction.authorName ?? "Unknown", size: 40)
+
+                        Text(reaction.authorName ?? "Unknown")
+                            .font(.body)
+
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle(reactionType)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - EditPlaceContentView (for NavigationStack push)
+struct EditPlaceContentView: View {
     let place: Place
-    @Binding var isPresented: Bool
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
-    
+
     @State private var placeName: String
     @State private var placeDescription: String
     @State private var selectedIcon: String
     @State private var selectedColor: String
-    
+
     private let iconOptions = ["mappin", "house", "building.2", "car", "fork.knife", "cup.and.saucer", "cart", "bag", "heart", "star"]
     private let colorOptions = ["#FF3B30", "#FF9500", "#FFCC02", "#34C759", "#007AFF", "#5856D6", "#AF52DE", "#FF2D92"]
-    
+
+    init(place: Place) {
+        self.place = place
+        self._placeName = State(initialValue: place.name ?? "")
+        self._placeDescription = State(initialValue: place.descriptionText ?? "")
+        self._selectedIcon = State(initialValue: place.iconName ?? "mappin")
+        self._selectedColor = State(initialValue: place.iconColor ?? "#FF3B30")
+    }
+
+    var body: some View {
+        Form {
+            Section(header: Text("Place Details")) {
+                TextField("Name", text: $placeName)
+                TextField("Description", text: $placeDescription, axis: .vertical)
+                    .lineLimit(3)
+            }
+
+            Section(header: Text("Icon")) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5)) {
+                    ForEach(iconOptions, id: \.self) { icon in
+                        Button(action: { selectedIcon = icon }) {
+                            ZStack {
+                                Circle()
+                                    .fill(selectedIcon == icon ? Color.blue.opacity(0.2) : Color.clear)
+                                    .frame(width: 40, height: 40)
+
+                                Image(systemName: icon)
+                                    .foregroundColor(selectedIcon == icon ? .blue : .primary)
+                                    .font(.system(size: 18))
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+
+            Section(header: Text("Color")) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4)) {
+                    ForEach(colorOptions, id: \.self) { color in
+                        Button(action: { selectedColor = color }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(hex: color))
+                                    .frame(width: 30, height: 30)
+
+                                if selectedColor == color {
+                                    Circle()
+                                        .stroke(Color.primary, lineWidth: 2)
+                                        .frame(width: 35, height: 35)
+                                }
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+        }
+        .navigationTitle("Edit Place")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Save") {
+                    saveChanges()
+                }
+                .disabled(placeName.isEmpty)
+            }
+        }
+    }
+
+    private func saveChanges() {
+        withAnimation {
+            place.name = placeName
+            place.descriptionText = placeDescription.isEmpty ? nil : placeDescription
+            place.iconName = selectedIcon
+            place.iconColor = selectedColor
+            place.modifiedDate = Date()
+
+            do {
+                try viewContext.save()
+                dismiss()
+            } catch {
+                let nsError = error as NSError
+                print("Failed to save place: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+}
+
+// MARK: - EditPlaceView (for sheet presentation)
+struct EditPlaceView: View {
+    let place: Place
+    @Binding var isPresented: Bool
+    @Environment(\.managedObjectContext) private var viewContext
+
+    @State private var placeName: String
+    @State private var placeDescription: String
+    @State private var selectedIcon: String
+    @State private var selectedColor: String
+
+    private let iconOptions = ["mappin", "house", "building.2", "car", "fork.knife", "cup.and.saucer", "cart", "bag", "heart", "star"]
+    private let colorOptions = ["#FF3B30", "#FF9500", "#FFCC02", "#34C759", "#007AFF", "#5856D6", "#AF52DE", "#FF2D92"]
+
     init(place: Place, isPresented: Binding<Bool>) {
         self.place = place
         self._isPresented = isPresented
@@ -446,7 +659,7 @@ struct EditPlaceView: View {
         self._selectedIcon = State(initialValue: place.iconName ?? "mappin")
         self._selectedColor = State(initialValue: place.iconColor ?? "#FF3B30")
     }
-    
+
     var body: some View {
         NavigationView {
             Form {
@@ -455,7 +668,7 @@ struct EditPlaceView: View {
                     TextField("Description", text: $placeDescription, axis: .vertical)
                         .lineLimit(3)
                 }
-                
+
                 Section(header: Text("Icon")) {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5)) {
                         ForEach(iconOptions, id: \.self) { icon in
@@ -464,7 +677,7 @@ struct EditPlaceView: View {
                                     Circle()
                                         .fill(selectedIcon == icon ? Color.blue.opacity(0.2) : Color.clear)
                                         .frame(width: 40, height: 40)
-                                    
+
                                     Image(systemName: icon)
                                         .foregroundColor(selectedIcon == icon ? .blue : .primary)
                                         .font(.system(size: 18))
@@ -474,7 +687,7 @@ struct EditPlaceView: View {
                         }
                     }
                 }
-                
+
                 Section(header: Text("Color")) {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4)) {
                         ForEach(colorOptions, id: \.self) { color in
@@ -483,7 +696,7 @@ struct EditPlaceView: View {
                                     Circle()
                                         .fill(Color(hex: color))
                                         .frame(width: 30, height: 30)
-                                    
+
                                     if selectedColor == color {
                                         Circle()
                                             .stroke(Color.primary, lineWidth: 2)
@@ -513,7 +726,7 @@ struct EditPlaceView: View {
             }
         }
     }
-    
+
     private func saveChanges() {
         withAnimation {
             place.name = placeName
@@ -521,7 +734,7 @@ struct EditPlaceView: View {
             place.iconName = selectedIcon
             place.iconColor = selectedColor
             place.modifiedDate = Date()
-            
+
             do {
                 try viewContext.save()
                 isPresented = false

@@ -19,6 +19,7 @@ struct DocumentDetailView: View {
 
     var body: some View {
         MapView(document: document, selectedPlace: $selectedPlace, filter: filterSettings)
+            .id(refreshID)
             .ignoresSafeArea()
             .overlay(alignment: .top) {
                 if document.isShared {
@@ -97,7 +98,6 @@ struct DocumentDetailView: View {
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
                 refreshID = UUID()
             }
-            .id(refreshID)
     }
 }
 
