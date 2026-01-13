@@ -9,7 +9,7 @@ class CloudKitService {
     static let shared = CloudKitService()
 
     private let persistentContainer = PersistenceController.shared.container
-    private let cloudKitContainer = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+    let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
 
     var isAvailable = false
     var userPresences: [String: UserPresence] = [:]
@@ -20,7 +20,7 @@ class CloudKitService {
     }
 
     private func checkCloudKitAvailability() {
-        cloudKitContainer.accountStatus { [weak self] status, error in
+        container.accountStatus { [weak self] status, error in
             DispatchQueue.main.async {
                 self?.isAvailable = (status == .available)
             }
@@ -30,7 +30,7 @@ class CloudKitService {
     private func requestUserDiscoverability() {
         Task {
             do {
-                let status = try await cloudKitContainer.requestApplicationPermission(.userDiscoverability)
+                let status = try await container.requestApplicationPermission(.userDiscoverability)
                 print("User discoverability status: \(status.rawValue)")
             } catch {
                 print("Failed to request user discoverability: \(error)")
@@ -82,7 +82,7 @@ class CloudKitService {
 
     func getCurrentUserRecordID() async -> CKRecord.ID? {
         do {
-            return try await cloudKitContainer.userRecordID()
+            return try await container.userRecordID()
         } catch {
             print("Failed to fetch user record ID: \(error)")
             return nil
@@ -91,8 +91,8 @@ class CloudKitService {
 
     func getCurrentUserDisplayName() async -> String? {
         do {
-            let recordID = try await cloudKitContainer.userRecordID()
-            let identity = try await cloudKitContainer.userIdentity(forUserRecordID: recordID)
+            let recordID = try await container.userRecordID()
+            let identity = try await container.userIdentity(forUserRecordID: recordID)
             if let nameComponents = identity?.nameComponents {
                 return PersonNameComponentsFormatter.localizedString(from: nameComponents, style: .short)
             }
@@ -105,8 +105,8 @@ class CloudKitService {
 
     func getCurrentUserIdentity() async -> CKUserIdentity? {
         do {
-            let recordID = try await cloudKitContainer.userRecordID()
-            return try await cloudKitContainer.userIdentity(forUserRecordID: recordID)
+            let recordID = try await container.userRecordID()
+            return try await container.userIdentity(forUserRecordID: recordID)
         } catch {
             print("Failed to fetch user identity: \(error)")
             return nil
@@ -140,7 +140,7 @@ class CloudKitService {
         guard isAvailable else { return }
         
         let presence = UserPresence(
-            userID: (try? await cloudKitContainer.userRecordID().recordName) ?? "currentUser",
+            userID: (try? await container.userRecordID().recordName) ?? "currentUser",
             documentID: document.id?.uuidString ?? "",
             location: location,
             lastSeen: Date()

@@ -39,7 +39,7 @@ struct DocumentShareView: View {
                     .buttonStyle(.borderedProminent)
                 }
             } else if let share = share {
-                CloudSharingView(share: share, container: CKContainer(identifier: CloudKitConfig.containerIdentifier), document: document)
+                CloudSharingView(share: share, container: CloudKitService.shared.container, document: document)
             } else {
                 VStack(spacing: 16) {
                     Text("Could not create share.")
