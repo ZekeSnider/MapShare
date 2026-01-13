@@ -86,6 +86,14 @@ struct DocumentDetailView: View {
             .onAppear {
                 showingItemsList = true
             }
+            .onChange(of: selectedPlace) { oldValue, newValue in
+                // Expand sheet to medium if a place is selected and sheet is at smallest detent
+                if newValue != nil && selectedDetent == .fraction(0.15) {
+                    withAnimation {
+                        selectedDetent = .medium
+                    }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)) { _ in
                 refreshID = UUID()
             }
