@@ -1,5 +1,5 @@
 import SwiftUI
-internal import CloudKit
+import CloudKit
 import UIKit
 import CoreData
 

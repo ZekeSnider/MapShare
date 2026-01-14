@@ -1,5 +1,5 @@
 import CoreData
-internal import CloudKit
+import CloudKit
 
 enum CloudKitConfig {
     static let containerIdentifier = "iCloud.com.zekesnider.mapshare"

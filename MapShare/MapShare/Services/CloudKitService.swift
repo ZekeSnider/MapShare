@@ -1,4 +1,4 @@
-internal import CloudKit
+import CloudKit
 import CoreData
 import CoreLocation
 import Foundation
@@ -78,6 +78,78 @@ class CloudKitService {
 //        } catch {
 //            print("Failed to stop sharing: \(error)")
 //        }
+    }
+
+    // MARK: - Share Acceptance
+
+    func acceptShareInvitationReturningID(from metadata: CKShare.Metadata) async -> NSManagedObjectID? {
+        // Find the shared store
+        guard let sharedStore = persistentContainer.persistentStoreCoordinator.persistentStores.first(where: { store in
+            store.url?.lastPathComponent == "MapShare-shared.sqlite"
+        }) else {
+            print("Shared store not found")
+            return nil
+        }
+
+        // Accept the share invitation
+        let accepted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            persistentContainer.acceptShareInvitations(from: [metadata], into: sharedStore) { sharedStoreURL, error in
+                if let error = error {
+                    print("Failed to accept share invitation: \(error)")
+                    continuation.resume(returning: false)
+                    return
+                }
+                print("Successfully accepted share invitation")
+                continuation.resume(returning: true)
+            }
+        }
+
+        guard accepted else { return nil }
+
+        // Wait for CloudKit to sync the shared data
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+        // Find the document on the main actor and return its ID
+        return await findDocumentID(from: metadata)
+    }
+
+    @MainActor
+    private func findDocumentID(from metadata: CKShare.Metadata) async -> NSManagedObjectID? {
+        let context = persistentContainer.viewContext
+        let fetchRequest: NSFetchRequest<Document> = Document.fetchRequest()
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \Document.modifiedDate, ascending: false)]
+
+        do {
+            let documents = try context.fetch(fetchRequest)
+
+            // Find document that matches the shared record - check each one
+            for document in documents {
+                do {
+                    let shares = try await persistentContainer.fetchShares(matching: [document.objectID])
+                    if let share = shares[document.objectID],
+                       share.recordID == metadata.share.recordID {
+                        return document.objectID
+                    }
+                } catch {
+                    continue
+                }
+            }
+
+            // If we couldn't match by share, return the most recently modified shared document
+            return documents.first { $0.isShared }?.objectID
+        } catch {
+            print("Failed to fetch documents: \(error)")
+            return nil
+        }
+    }
+
+    func fetchShareMetadata(from url: URL) async -> CKShare.Metadata? {
+        do {
+            return try await container.shareMetadata(for: url)
+        } catch {
+            print("Failed to fetch share metadata: \(error)")
+            return nil
+        }
     }
 
     func getCurrentUserRecordID() async -> CKRecord.ID? {

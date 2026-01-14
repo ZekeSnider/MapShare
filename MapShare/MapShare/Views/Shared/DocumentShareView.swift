@@ -1,6 +1,6 @@
 import SwiftUI
 import CoreData
-internal import CloudKit
+import CloudKit
 
 struct DocumentShareView: View {
     let document: Document

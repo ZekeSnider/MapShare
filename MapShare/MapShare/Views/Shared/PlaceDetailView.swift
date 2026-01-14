@@ -1,7 +1,7 @@
 import SwiftUI
 import MapKit
 import CoreData
-internal import CloudKit
+import CloudKit
 
 // MARK: - PlaceDetailContent (for NavigationStack push)
 struct PlaceDetailContent: View {

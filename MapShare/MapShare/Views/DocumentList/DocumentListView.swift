@@ -3,38 +3,40 @@ import CoreData
 
 struct DocumentListView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(AppState.self) private var appState
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Document.modifiedDate, ascending: false)],
         animation: .default
     ) private var documents: FetchedResults<Document>
-    
+
     @State private var showingAddDocument = false
     @State private var selectedDocument: Document?
     @State private var showingShareDocument = false
     @State private var newDocumentName = ""
-    
+    @State private var navigationPath = NavigationPath()
+
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             List {
                 ForEach(documents) { document in
-                    NavigationLink(destination: DocumentDetailView(document: document)) {
+                    NavigationLink(value: document) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(document.name ?? "Untitled")
                                 .font(.headline)
-                            
+
                             HStack {
                                 Label("\(document.placesArray.count) places", systemImage: "mappin")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                
+
                                 if document.isShared {
                                     Label("Shared", systemImage: "person.2")
                                         .font(.caption)
                                         .foregroundColor(.blue)
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 Text(document.modifiedDate ?? Date(), style: .relative)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -46,19 +48,22 @@ struct DocumentListView: View {
                         Button(action: { shareDocument(document) }) {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
-                        
+
                         Button(action: { duplicateDocument(document) }) {
                             Label("Duplicate", systemImage: "doc.on.doc")
                         }
-                        
+
                         Divider()
-                        
+
                         Button(role: .destructive, action: { deleteDocument(document) }) {
                             Label("Delete", systemImage: "trash")
                         }
                     }
                 }
                 .onDelete(perform: deleteDocuments)
+            }
+            .navigationDestination(for: Document.self) { document in
+                DocumentDetailView(document: document)
             }
             .navigationTitle("My Maps")
             .toolbar {
@@ -99,6 +104,32 @@ struct DocumentListView: View {
             .sheet(isPresented: $showingShareDocument) {
                 if let document = selectedDocument {
                     DocumentShareView(document: document, isPresented: $showingShareDocument)
+                }
+            }
+            .onChange(of: appState.documentIDToOpen) { _, objectID in
+                print("🔄 onChange triggered, objectID: \(String(describing: objectID))")
+                if let objectID = objectID {
+                    print("📍 Fetching document for objectID...")
+                    if let document = try? viewContext.existingObject(with: objectID) as? Document {
+                        print("✅ Found document: \(document.name ?? "unnamed"), navigating...")
+                        navigationPath = NavigationPath()
+                        navigationPath.append(document)
+                        appState.clearPendingNavigation()
+                    } else {
+                        print("❌ Could not fetch document for objectID")
+                    }
+                }
+            }
+            .onAppear {
+                // Handle any pending navigation when view appears
+                print("👀 onAppear, documentIDToOpen: \(String(describing: appState.documentIDToOpen))")
+                if let objectID = appState.documentIDToOpen {
+                    if let document = try? viewContext.existingObject(with: objectID) as? Document {
+                        print("✅ Found pending document on appear: \(document.name ?? "unnamed")")
+                        navigationPath = NavigationPath()
+                        navigationPath.append(document)
+                        appState.clearPendingNavigation()
+                    }
                 }
             }
         }
@@ -180,4 +211,5 @@ struct DocumentListView: View {
 #Preview {
     DocumentListView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+        .environment(AppState.shared)
 }
