@@ -5,16 +5,18 @@ import CoreData
 struct MapView: View {
     let document: Document
     @Binding var selectedPlace: Place?
+    @Binding var centerOnPlace: Place?
     let filter: FilterSettings
 
     var body: some View {
-        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, filter: filter)
+        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filter)
     }
 }
 
 struct MapViewRepresentable: UIViewRepresentable {
     let document: Document
     @Binding var selectedPlace: Place?
+    @Binding var centerOnPlace: Place?
     let filter: FilterSettings
 
     func makeUIView(context: Context) -> MKMapView {
@@ -34,8 +36,28 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         uiView.addAnnotations(annotations)
 
-        if !annotations.isEmpty {
+        // Center on specific place if requested (from list tap)
+        // Offset the center so the place appears in the top third of the map (above the sheet)
+        if let place = centerOnPlace {
+            let latitudinalMeters: Double = 1000
+            let region = MKCoordinateRegion(
+                center: place.coordinate,
+                latitudinalMeters: latitudinalMeters,
+                longitudinalMeters: 1000
+            )
+            // Offset center southward so place appears in top third
+            let offsetCenter = CLLocationCoordinate2D(
+                latitude: place.coordinate.latitude - region.span.latitudeDelta * 0.35,
+                longitude: place.coordinate.longitude
+            )
+            let offsetRegion = MKCoordinateRegion(center: offsetCenter, span: region.span)
+            uiView.setRegion(offsetRegion, animated: true)
+            DispatchQueue.main.async {
+                self.centerOnPlace = nil
+            }
+        } else if !annotations.isEmpty && !context.coordinator.hasInitiallyZoomed {
             centerMap(on: uiView)
+            context.coordinator.hasInitiallyZoomed = true
         }
     }
 
@@ -60,6 +82,7 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapViewRepresentable
+        var hasInitiallyZoomed = false
 
         init(_ parent: MapViewRepresentable) {
             self.parent = parent
@@ -159,6 +182,6 @@ class PlaceAnnotationView: MKAnnotationView {
     let context = PersistenceController.preview.container.viewContext
     let document = Document(name: "Sample Document", context: context)
 
-    return MapView(document: document, selectedPlace: .constant(nil), filter: FilterSettings())
+    return MapView(document: document, selectedPlace: .constant(nil), centerOnPlace: .constant(nil), filter: FilterSettings())
         .environment(\.managedObjectContext, context)
 }

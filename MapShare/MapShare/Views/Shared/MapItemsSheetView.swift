@@ -4,6 +4,7 @@ import CoreLocation
 struct MapItemsListView: View {
     let document: Document
     @Binding var selectedPlace: Place?
+    @Binding var centerOnPlace: Place?
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -22,6 +23,7 @@ struct MapItemsListView: View {
                             isSelected: selectedPlace?.id == place.id,
                             onTap: {
                                 selectedPlace = place
+                                centerOnPlace = place
                                 navigationPath.append(place)
                             }
                         )

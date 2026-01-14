@@ -10,6 +10,7 @@ struct DocumentDetailView: View {
     var document: Document
     @State private var showingAddPlace = false
     @State private var selectedPlace: Place?
+    @State private var centerOnPlace: Place?
     @State private var showingShareDocument = false
     @State private var filterSettings = FilterSettings()
     @State private var selectedDetent: PresentationDetent = .fraction(0.15)
@@ -18,7 +19,7 @@ struct DocumentDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
-        MapView(document: document, selectedPlace: $selectedPlace, filter: filterSettings)
+        MapView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filterSettings)
             .id(refreshID)
             .ignoresSafeArea()
             .overlay(alignment: .top) {
@@ -78,7 +79,7 @@ struct DocumentDetailView: View {
                 DocumentShareView(document: document, isPresented: $showingShareDocument)
             }
             .sheet(isPresented: $showingItemsList) {
-                MapItemsListView(document: document, selectedPlace: $selectedPlace)
+                MapItemsListView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace)
                     .presentationDetents([.fraction(0.15), .medium, .large], selection: $selectedDetent)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))
