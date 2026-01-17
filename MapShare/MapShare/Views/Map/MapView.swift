@@ -7,9 +7,10 @@ struct MapView: View {
     @Binding var selectedPlace: Place?
     @Binding var centerOnPlace: Place?
     let filter: FilterSettings
+    var searchState: SearchState?
 
     var body: some View {
-        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filter)
+        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filter, searchState: searchState)
     }
 }
 
@@ -18,11 +19,13 @@ struct MapViewRepresentable: UIViewRepresentable {
     @Binding var selectedPlace: Place?
     @Binding var centerOnPlace: Place?
     let filter: FilterSettings
+    var searchState: SearchState?
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: "place")
+        mapView.register(SearchResultAnnotationView.self, forAnnotationViewWithReuseIdentifier: SearchResultAnnotationView.reuseIdentifier)
         return mapView
     }
 
@@ -32,6 +35,12 @@ struct MapViewRepresentable: UIViewRepresentable {
         var annotations: [MKAnnotation] = []
         if filter.showPlaces {
             annotations.append(contentsOf: document.placesArray as [MKAnnotation])
+        }
+
+        // Add search results when in search mode
+        if let searchState = searchState, searchState.mode == .search {
+            let searchAnnotations = searchState.searchResults.map { SearchResultAnnotation(searchResult: $0) }
+            annotations.append(contentsOf: searchAnnotations)
         }
 
         uiView.addAnnotations(annotations)
@@ -55,9 +64,50 @@ struct MapViewRepresentable: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.centerOnPlace = nil
             }
+        } else if let searchState = searchState, let result = searchState.centerOnResult {
+            // Center on search result if requested (from list tap)
+            let region = MKCoordinateRegion(
+                center: result.coordinate,
+                latitudinalMeters: 1000,
+                longitudinalMeters: 1000
+            )
+            let offsetCenter = CLLocationCoordinate2D(
+                latitude: result.coordinate.latitude - region.span.latitudeDelta * 0.35,
+                longitude: result.coordinate.longitude
+            )
+            let offsetRegion = MKCoordinateRegion(center: offsetCenter, span: region.span)
+            uiView.setRegion(offsetRegion, animated: true)
+            DispatchQueue.main.async {
+                searchState.centerOnResult = nil
+            }
         } else if !annotations.isEmpty && !context.coordinator.hasInitiallyZoomed {
             centerMap(on: uiView)
             context.coordinator.hasInitiallyZoomed = true
+        }
+
+        // Zoom to fit search results when they first appear
+        if let searchState = searchState,
+           searchState.mode == .search,
+           !searchState.searchResults.isEmpty,
+           !context.coordinator.hasZoomedToSearchResults {
+            zoomToSearchResults(on: uiView)
+            context.coordinator.hasZoomedToSearchResults = true
+        } else if searchState?.mode == .browse {
+            context.coordinator.hasZoomedToSearchResults = false
+        }
+
+        // Select/highlight the annotation for the currently viewed result
+        if let searchState = searchState,
+           let highlightedResult = searchState.highlightedResult {
+            // Find and select the matching annotation
+            if let annotation = uiView.annotations.first(where: { annotation in
+                guard let searchAnnotation = annotation as? SearchResultAnnotation else { return false }
+                return searchAnnotation.searchResult.id == highlightedResult.id
+            }) {
+                if uiView.selectedAnnotations.first as? SearchResultAnnotation !== annotation as? SearchResultAnnotation {
+                    uiView.selectAnnotation(annotation, animated: true)
+                }
+            }
         }
     }
 
@@ -80,9 +130,24 @@ struct MapViewRepresentable: UIViewRepresentable {
         mapView.setVisibleMapRect(mapRect, edgePadding: UIEdgeInsets(top: 50, left: 50, bottom: 50, right: 50), animated: true)
     }
 
+    private func zoomToSearchResults(on mapView: MKMapView) {
+        let searchAnnotations = mapView.annotations.compactMap { $0 as? SearchResultAnnotation }
+        guard !searchAnnotations.isEmpty else { return }
+
+        var mapRect = MKMapRect.null
+        searchAnnotations.forEach { annotation in
+            let point = MKMapPoint(annotation.coordinate)
+            mapRect = mapRect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
+        }
+
+        // Add extra bottom padding to account for the sheet
+        mapView.setVisibleMapRect(mapRect, edgePadding: UIEdgeInsets(top: 80, left: 50, bottom: 300, right: 50), animated: true)
+    }
+
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapViewRepresentable
         var hasInitiallyZoomed = false
+        var hasZoomedToSearchResults = false
 
         init(_ parent: MapViewRepresentable) {
             self.parent = parent
@@ -94,12 +159,38 @@ struct MapViewRepresentable: UIViewRepresentable {
                 view.place = place
                 return view
             }
+
+            if let searchAnnotation = annotation as? SearchResultAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(
+                    withIdentifier: SearchResultAnnotationView.reuseIdentifier,
+                    for: annotation
+                ) as! SearchResultAnnotationView
+                view.searchResult = searchAnnotation.searchResult
+                return view
+            }
+
             return nil
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             if let placeAnnotation = view.annotation as? Place {
                 parent.selectedPlace = placeAnnotation
+            }
+
+            // Handle search result tap - trigger navigation
+            if let searchAnnotation = view.annotation as? SearchResultAnnotation {
+                (view as? SearchResultAnnotationView)?.setSelected(true)
+                // Only trigger navigation if this isn't already the highlighted result
+                // (to avoid double navigation when programmatically selecting)
+                if parent.searchState?.highlightedResult?.id != searchAnnotation.searchResult.id {
+                    parent.searchState?.resultToNavigate = searchAnnotation.searchResult
+                }
+            }
+        }
+
+        func mapView(_ mapView: MKMapView, didDeselect view: MKAnnotationView) {
+            if let searchView = view as? SearchResultAnnotationView {
+                searchView.setSelected(false)
             }
         }
     }

@@ -8,7 +8,6 @@ struct FilterSettings {
 
 struct DocumentDetailView: View {
     var document: Document
-    @State private var showingAddPlace = false
     @State private var selectedPlace: Place?
     @State private var centerOnPlace: Place?
     @State private var showingShareDocument = false
@@ -16,10 +15,11 @@ struct DocumentDetailView: View {
     @State private var selectedDetent: PresentationDetent = .fraction(0.15)
     @State private var showingItemsList = false
     @State private var refreshID = UUID()
+    @State private var searchState = SearchState()
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
-        MapView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filterSettings)
+        MapView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filterSettings, searchState: searchState)
             .id(refreshID)
             .ignoresSafeArea()
             .overlay(alignment: .top) {
@@ -52,7 +52,14 @@ struct DocumentDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
-                        Button(action: { showingAddPlace = true }) {
+                        Button(action: {
+                            searchState.startSearch()
+                            if selectedDetent == .fraction(0.15) {
+                                withAnimation {
+                                    selectedDetent = .medium
+                                }
+                            }
+                        }) {
                             Image(systemName: "plus")
                         }
                         Menu {
@@ -72,14 +79,11 @@ struct DocumentDetailView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAddPlace) {
-                PlaceSearchView(document: document, isPresented: $showingAddPlace)
-            }
             .sheet(isPresented: $showingShareDocument) {
                 DocumentShareView(document: document, isPresented: $showingShareDocument)
             }
             .sheet(isPresented: $showingItemsList) {
-                MapItemsListView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace)
+                MapItemsListView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, searchState: searchState)
                     .presentationDetents([.fraction(0.15), .medium, .large], selection: $selectedDetent)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))

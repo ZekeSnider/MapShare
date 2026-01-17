@@ -17,6 +17,13 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				MapShare/MapShare/Models/CLAUDE.md,
+				MapShare/MapShare/Views/Map/CLAUDE.md,
+				MapShare/MapShare/Views/Shared/CLAUDE.md,
+				Models/CLAUDE.md,
+				Views/DocumentDetail/CLAUDE.md,
+				Views/Map/CLAUDE.md,
+				Views/Shared/CLAUDE.md,
 			);
 			target = B420F9A32F13420F00AC9C47 /* MapShare */;
 		};
