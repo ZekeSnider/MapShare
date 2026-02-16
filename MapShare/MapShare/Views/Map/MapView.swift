@@ -85,13 +85,15 @@ struct MapViewRepresentable: UIViewRepresentable {
             context.coordinator.hasInitiallyZoomed = true
         }
 
-        // Zoom to fit search results when they first appear
+        // Zoom to fit search results when they first appear or when a new search is performed
         if let searchState = searchState,
            searchState.mode == .search,
-           !searchState.searchResults.isEmpty,
-           !context.coordinator.hasZoomedToSearchResults {
-            zoomToSearchResults(on: uiView)
-            context.coordinator.hasZoomedToSearchResults = true
+           !searchState.searchResults.isEmpty {
+            if !context.coordinator.hasZoomedToSearchResults || searchState.searchGeneration != context.coordinator.lastSearchGeneration {
+                zoomToSearchResults(on: uiView)
+                context.coordinator.hasZoomedToSearchResults = true
+                context.coordinator.lastSearchGeneration = searchState.searchGeneration
+            }
         } else if searchState?.mode == .browse {
             context.coordinator.hasZoomedToSearchResults = false
         }
@@ -148,6 +150,7 @@ struct MapViewRepresentable: UIViewRepresentable {
         var parent: MapViewRepresentable
         var hasInitiallyZoomed = false
         var hasZoomedToSearchResults = false
+        var lastSearchGeneration = 0
 
         init(_ parent: MapViewRepresentable) {
             self.parent = parent
@@ -192,6 +195,10 @@ struct MapViewRepresentable: UIViewRepresentable {
             if let searchView = view as? SearchResultAnnotationView {
                 searchView.setSelected(false)
             }
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            parent.searchState?.mapRegionDidChange(mapView.region)
         }
     }
 }

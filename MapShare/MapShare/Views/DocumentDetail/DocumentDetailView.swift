@@ -23,7 +23,8 @@ struct DocumentDetailView: View {
             .id(refreshID)
             .ignoresSafeArea()
             .overlay(alignment: .top) {
-                if document.isShared {
+                VStack(spacing: 8) {
+                    if document.isShared {
                     HStack {
                         Spacer()
                         HStack(spacing: 8) {
@@ -45,6 +46,25 @@ struct DocumentDetailView: View {
                         .padding(.trailing)
                     }
                     .padding(.top, 8)
+                    }
+
+                    if searchState.showSearchHereButton {
+                        Button {
+                            searchState.showSearchHereButton = false
+                            Task {
+                                await searchState.performSearch()
+                            }
+                        } label: {
+                            Label("Search Here", systemImage: "magnifyingglass")
+                                .font(.subheadline.weight(.medium))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .shadow(radius: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
             }
             .navigationTitle(document.name ?? "Untitled")
