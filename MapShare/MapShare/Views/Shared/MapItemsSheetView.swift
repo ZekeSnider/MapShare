@@ -90,8 +90,15 @@ struct MapItemsListView: View {
             }
         }
         .onChange(of: selectedPlace) { oldValue, newValue in
-            if let place = newValue, navigationPath.isEmpty, searchState.mode == .browse {
-                navigationPath.append(place)
+            if let place = newValue, searchState.mode == .browse {
+                if navigationPath.isEmpty {
+                    navigationPath.append(place)
+                } else {
+                    // Replace current detail with the newly selected place
+                    var newPath = NavigationPath()
+                    newPath.append(place)
+                    navigationPath = newPath
+                }
             }
         }
         .onChange(of: navigationPath) { oldValue, newValue in
