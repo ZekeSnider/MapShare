@@ -3,6 +3,41 @@ import MapKit
 import CoreData
 import CoreLocation
 
+func iconForCategory(_ category: String?) -> String {
+    guard let category = category else { return "mappin" }
+
+    switch category {
+    case "MKPOICategoryRestaurant", "MKPOICategoryCafe":
+        return "fork.knife"
+    case "MKPOICategoryStore", "MKPOICategoryShoppingCenter":
+        return "bag"
+    case "MKPOICategoryGasStation":
+        return "car"
+    case "MKPOICategoryHotel":
+        return "bed.double"
+    case "MKPOICategoryHospital", "MKPOICategoryPharmacy":
+        return "cross.case"
+    case "MKPOICategorySchool", "MKPOICategoryUniversity":
+        return "graduationcap"
+    case "MKPOICategoryPark":
+        return "leaf"
+    case "MKPOICategoryMuseum":
+        return "building.columns"
+    case "MKPOICategoryTheater":
+        return "theatermasks"
+    case "MKPOICategoryNightlife", "MKPOICategoryBar":
+        return "wineglass"
+    case "MKPOICategoryGym", "MKPOICategoryFitnessCenter":
+        return "dumbbell"
+    case "MKPOICategoryAirport":
+        return "airplane"
+    case "MKPOICategoryBank", "MKPOICategoryATM":
+        return "banknote"
+    default:
+        return "mappin"
+    }
+}
+
 struct PlaceSearchView: View {
     let document: Document
     @Binding var isPresented: Bool
@@ -146,7 +181,8 @@ struct PlaceSearchView: View {
                     prefilledAddress: result.address,
                     prefilledPhoneNumber: result.phoneNumber,
                     prefilledWebsiteURL: result.url,
-                    prefilledMapItemIdentifier: result.mapItemIdentifier
+                    prefilledMapItemIdentifier: result.mapItemIdentifier,
+                    prefilledIcon: iconForCategory(result.category)
                 )
             }
             .navigationDestination(for: String.self) { _ in
@@ -185,40 +221,6 @@ struct PlaceSearchView: View {
         }
     }
 
-    private func iconForCategory(_ category: String?) -> String {
-        guard let category = category else { return "mappin" }
-
-        switch category {
-        case "MKPOICategoryRestaurant", "MKPOICategoryCafe":
-            return "fork.knife"
-        case "MKPOICategoryStore", "MKPOICategoryShoppingCenter":
-            return "bag"
-        case "MKPOICategoryGasStation":
-            return "car"
-        case "MKPOICategoryHotel":
-            return "bed.double"
-        case "MKPOICategoryHospital", "MKPOICategoryPharmacy":
-            return "cross.case"
-        case "MKPOICategorySchool", "MKPOICategoryUniversity":
-            return "graduationcap"
-        case "MKPOICategoryPark":
-            return "leaf"
-        case "MKPOICategoryMuseum":
-            return "building.columns"
-        case "MKPOICategoryTheater":
-            return "theatermasks"
-        case "MKPOICategoryNightlife", "MKPOICategoryBar":
-            return "wineglass"
-        case "MKPOICategoryGym", "MKPOICategoryFitnessCenter":
-            return "dumbbell"
-        case "MKPOICategoryAirport":
-            return "airplane"
-        case "MKPOICategoryBank", "MKPOICategoryATM":
-            return "banknote"
-        default:
-            return "mappin"
-        }
-    }
 }
 
 // Embedded version without its own NavigationView
@@ -231,6 +233,7 @@ struct AddPlaceViewEmbedded: View {
     var prefilledPhoneNumber: String?
     var prefilledWebsiteURL: URL?
     var prefilledMapItemIdentifier: String?
+    var prefilledIcon: String?
     var onSave: (() -> Void)?
 
     @Environment(\.managedObjectContext) private var viewContext
@@ -356,6 +359,9 @@ struct AddPlaceViewEmbedded: View {
             // Prefill data if provided
             if let name = prefilledName {
                 placeName = name
+            }
+            if let icon = prefilledIcon {
+                selectedIcon = icon
             }
             if let coordinate = prefilledCoordinate {
                 selectedLocation = coordinate

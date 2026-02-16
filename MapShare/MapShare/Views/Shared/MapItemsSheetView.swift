@@ -65,6 +65,7 @@ struct MapItemsListView: View {
                     prefilledPhoneNumber: result.phoneNumber,
                     prefilledWebsiteURL: result.url,
                     prefilledMapItemIdentifier: result.mapItemIdentifier,
+                    prefilledIcon: iconForCategory(result.category),
                     onSave: {
                         searchState.clearSearch()
                         navigationPath.removeLast()
@@ -271,40 +272,6 @@ struct SearchResultRowView: View {
         .buttonStyle(.plain)
     }
 
-    private func iconForCategory(_ category: String?) -> String {
-        guard let category = category else { return "mappin" }
-
-        switch category {
-        case "MKPOICategoryRestaurant", "MKPOICategoryCafe":
-            return "fork.knife"
-        case "MKPOICategoryStore", "MKPOICategoryShoppingCenter":
-            return "bag"
-        case "MKPOICategoryGasStation":
-            return "car"
-        case "MKPOICategoryHotel":
-            return "bed.double"
-        case "MKPOICategoryHospital", "MKPOICategoryPharmacy":
-            return "cross.case"
-        case "MKPOICategorySchool", "MKPOICategoryUniversity":
-            return "graduationcap"
-        case "MKPOICategoryPark":
-            return "leaf"
-        case "MKPOICategoryMuseum":
-            return "building.columns"
-        case "MKPOICategoryTheater":
-            return "theatermasks"
-        case "MKPOICategoryNightlife", "MKPOICategoryBar":
-            return "wineglass"
-        case "MKPOICategoryGym", "MKPOICategoryFitnessCenter":
-            return "dumbbell"
-        case "MKPOICategoryAirport":
-            return "airplane"
-        case "MKPOICategoryBank", "MKPOICategoryATM":
-            return "banknote"
-        default:
-            return "mappin"
-        }
-    }
 }
 
 // MARK: - Place Row View
