@@ -20,29 +20,13 @@ struct DocumentListView: View {
             List {
                 ForEach(documents) { document in
                     NavigationLink(value: document) {
-                        VStack(alignment: .leading, spacing: 4) {
+                        HStack {
                             Text(document.name ?? "Untitled")
-                                .font(.headline)
-
-                            HStack {
-                                Label("\(document.placesArray.count) places", systemImage: "mappin")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-
-                                if document.isShared {
-                                    Label("Shared", systemImage: "person.2")
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                }
-
-                                Spacer()
-
-                                Text(document.modifiedDate ?? Date(), style: .relative)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                                .fontWeight(.bold)
+                            Spacer()
+                            Text("\(document.placesArray.count) places")
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
                     .contextMenu {
                         Button(action: { shareDocument(document) }) {
