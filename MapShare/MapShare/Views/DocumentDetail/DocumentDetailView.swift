@@ -19,8 +19,7 @@ struct DocumentDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
-        MapView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filterSettings, searchState: searchState)
-            .id(refreshID)
+        MapView(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filterSettings, searchState: searchState, refreshID: refreshID)
             .ignoresSafeArea()
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {

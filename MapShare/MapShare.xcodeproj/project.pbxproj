@@ -18,10 +18,14 @@
 			membershipExceptions = (
 				Info.plist,
 				MapShare/MapShare/Models/CLAUDE.md,
+				MapShare/MapShare/Views/DocumentDetail/CLAUDE.md,
 				MapShare/MapShare/Views/Map/CLAUDE.md,
 				MapShare/MapShare/Views/Shared/CLAUDE.md,
+				MapShare/Views/DocumentDetail/CLAUDE.md,
+				MapShare/Views/Map/CLAUDE.md,
 				Models/CLAUDE.md,
 				Views/DocumentDetail/CLAUDE.md,
+				Views/DocumentList/CLAUDE.md,
 				Views/Map/CLAUDE.md,
 				Views/Shared/CLAUDE.md,
 			);

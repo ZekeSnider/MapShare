@@ -8,9 +8,10 @@ struct MapView: View {
     @Binding var centerOnPlace: Place?
     let filter: FilterSettings
     var searchState: SearchState?
+    var refreshID: UUID = UUID()
 
     var body: some View {
-        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filter, searchState: searchState)
+        MapViewRepresentable(document: document, selectedPlace: $selectedPlace, centerOnPlace: $centerOnPlace, filter: filter, searchState: searchState, refreshID: refreshID)
     }
 }
 
@@ -20,6 +21,7 @@ struct MapViewRepresentable: UIViewRepresentable {
     @Binding var centerOnPlace: Place?
     let filter: FilterSettings
     var searchState: SearchState?
+    var refreshID: UUID
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -309,6 +311,6 @@ class PlaceAnnotationView: MKAnnotationView {
     let context = PersistenceController.preview.container.viewContext
     let document = Document(name: "Sample Document", context: context)
 
-    return MapView(document: document, selectedPlace: .constant(nil), centerOnPlace: .constant(nil), filter: FilterSettings())
+    return MapView(document: document, selectedPlace: .constant(nil), centerOnPlace: .constant(nil), filter: FilterSettings(), refreshID: UUID())
         .environment(\.managedObjectContext, context)
 }
