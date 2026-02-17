@@ -94,6 +94,13 @@ struct MapViewRepresentable: UIViewRepresentable {
                 context.coordinator.hasZoomedToSearchResults = true
                 context.coordinator.lastSearchGeneration = searchState.searchGeneration
             }
+            // Zoom back to all results when navigating back from a single result
+            if searchState.shouldZoomToAllResults {
+                zoomToSearchResults(on: uiView)
+                DispatchQueue.main.async {
+                    searchState.shouldZoomToAllResults = false
+                }
+            }
         } else if searchState?.mode == .browse {
             context.coordinator.hasZoomedToSearchResults = false
         }

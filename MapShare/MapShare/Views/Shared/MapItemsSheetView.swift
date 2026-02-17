@@ -105,9 +105,12 @@ struct MapItemsListView: View {
             if newValue.isEmpty && selectedPlace != nil {
                 selectedPlace = nil
             }
-            // Clear highlight when navigating back to search results
+            // When navigating back to search results list, zoom out to show all results
             if newValue.isEmpty && searchState.highlightedResult != nil {
                 searchState.highlightedResult = nil
+                if searchState.mode == .search && !searchState.searchResults.isEmpty {
+                    searchState.shouldZoomToAllResults = true
+                }
             }
         }
         .onChange(of: searchState.mode) { oldValue, newValue in

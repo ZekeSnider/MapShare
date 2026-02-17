@@ -17,6 +17,7 @@ class SearchState {
     var resultToNavigate: SearchResult? = nil  // Set when map annotation is tapped to trigger navigation
     var highlightedResult: SearchResult? = nil  // The result currently being viewed (pin should be highlighted)
     var showSearchHereButton: Bool = false
+    var shouldZoomToAllResults: Bool = false
     var lastSearchRegion: MKCoordinateRegion?
     var searchGeneration: Int = 0
     var mapRegion: MKCoordinateRegion = MKCoordinateRegion(
