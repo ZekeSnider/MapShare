@@ -233,10 +233,30 @@ class PlaceAnnotationView: MKAnnotationView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private let glossView = UIView()
+
     private func setupViews() {
         // Pin circle
         pinView.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
         pinView.layer.cornerRadius = 15
+
+        // Shadow for embossed/raised look
+        pinView.layer.shadowColor = UIColor.black.cgColor
+        pinView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        pinView.layer.shadowRadius = 3
+        pinView.layer.shadowOpacity = 0.35
+
+        // Subtle dark border for definition
+        pinView.layer.borderWidth = 0.5
+        pinView.layer.borderColor = UIColor.black.withAlphaComponent(0.15).cgColor
+
+        // Gloss highlight on upper half for 3D embossed effect
+        glossView.frame = CGRect(x: 0, y: 0, width: 30, height: 15)
+        glossView.backgroundColor = UIColor.white.withAlphaComponent(0.25)
+        glossView.isUserInteractionEnabled = false
+        glossView.layer.cornerRadius = 15
+        glossView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        glossView.layer.masksToBounds = true
 
         // Icon
         iconImageView.tintColor = .white
@@ -252,6 +272,7 @@ class PlaceAnnotationView: MKAnnotationView {
         nameLabel.layer.masksToBounds = true
 
         pinView.addSubview(iconImageView)
+        pinView.addSubview(glossView)
         addSubview(pinView)
         addSubview(nameLabel)
     }
@@ -279,6 +300,7 @@ class PlaceAnnotationView: MKAnnotationView {
 
         pinView.frame = CGRect(x: (totalWidth - 30) / 2, y: 0, width: 30, height: 30)
         iconImageView.frame = pinView.bounds.insetBy(dx: 7, dy: 7)
+        glossView.frame = CGRect(x: 0, y: 0, width: 30, height: 15)
         nameLabel.frame = CGRect(x: (totalWidth - labelWidth) / 2, y: 34, width: labelWidth, height: nameLabel.frame.height)
     }
 }

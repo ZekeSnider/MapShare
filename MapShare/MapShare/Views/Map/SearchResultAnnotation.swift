@@ -31,6 +31,7 @@ class SearchResultAnnotationView: MKAnnotationView {
 
     private let pinView = UIView()
     private let iconImageView = UIImageView()
+    private let glossView = UIView()
 
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
@@ -47,16 +48,27 @@ class SearchResultAnnotationView: MKAnnotationView {
         pinView.backgroundColor = .white
         pinView.layer.borderWidth = 2.5
         pinView.layer.borderColor = UIColor.systemBlue.cgColor
+
+        // Enhanced shadow for embossed look
         pinView.layer.shadowColor = UIColor.black.cgColor
-        pinView.layer.shadowOffset = CGSize(width: 0, height: 1)
-        pinView.layer.shadowRadius = 2
-        pinView.layer.shadowOpacity = 0.2
+        pinView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        pinView.layer.shadowRadius = 3
+        pinView.layer.shadowOpacity = 0.3
+
+        // Gloss highlight on upper half
+        glossView.frame = CGRect(x: 0, y: 0, width: 28, height: 14)
+        glossView.backgroundColor = UIColor.white.withAlphaComponent(0.4)
+        glossView.isUserInteractionEnabled = false
+        glossView.layer.cornerRadius = 14
+        glossView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        glossView.layer.masksToBounds = true
 
         iconImageView.tintColor = .systemBlue
         iconImageView.contentMode = .scaleAspectFit
         iconImageView.frame = pinView.bounds.insetBy(dx: 6, dy: 6)
 
         pinView.addSubview(iconImageView)
+        pinView.addSubview(glossView)
         addSubview(pinView)
 
         frame = CGRect(x: 0, y: 0, width: 28, height: 28)
@@ -73,6 +85,7 @@ class SearchResultAnnotationView: MKAnnotationView {
             self.transform = selected ? CGAffineTransform(scaleX: 1.3, y: 1.3) : .identity
             self.pinView.backgroundColor = selected ? .systemBlue : .white
             self.iconImageView.tintColor = selected ? .white : .systemBlue
+            self.glossView.backgroundColor = UIColor.white.withAlphaComponent(selected ? 0.25 : 0.4)
         }
     }
 
