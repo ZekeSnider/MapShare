@@ -38,6 +38,7 @@
         <attribute name="modifiedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="name" optional="YES" attributeType="String"/>
         <attribute name="phoneNumber" optional="YES" attributeType="String"/>
+        <attribute name="visited" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="websiteURL" optional="YES" attributeType="URI"/>
         <relationship name="addedBy" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Participant" inverseName="placesAdded" inverseEntity="Participant"/>
         <relationship name="comments" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Comment" inverseName="place" inverseEntity="Comment"/>

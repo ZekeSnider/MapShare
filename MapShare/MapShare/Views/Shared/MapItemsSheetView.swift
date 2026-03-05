@@ -327,6 +327,12 @@ struct PlaceRowView: View {
 
                 Spacer()
 
+                if place.visited {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 14))
+                }
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.blue)

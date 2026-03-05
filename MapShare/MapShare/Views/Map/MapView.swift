@@ -225,6 +225,7 @@ class PlaceAnnotationView: MKAnnotationView {
     private let pinView = UIView()
     private let iconImageView = UIImageView()
     private let nameLabel = UILabel()
+    private let visitedBadge = UIView()
 
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
@@ -273,9 +274,25 @@ class PlaceAnnotationView: MKAnnotationView {
         nameLabel.layer.cornerRadius = 4
         nameLabel.layer.masksToBounds = true
 
+        // Visited badge (checkmark circle)
+        let badgeSize: CGFloat = 14
+        visitedBadge.frame = CGRect(x: 0, y: 0, width: badgeSize, height: badgeSize)
+        visitedBadge.layer.cornerRadius = badgeSize / 2
+        visitedBadge.backgroundColor = UIColor.systemGreen
+        visitedBadge.layer.borderWidth = 1.5
+        visitedBadge.layer.borderColor = UIColor.white.cgColor
+        visitedBadge.isHidden = true
+
+        let checkmark = UIImageView(image: UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 8, weight: .bold)))
+        checkmark.tintColor = .white
+        checkmark.frame = visitedBadge.bounds
+        checkmark.contentMode = .center
+        visitedBadge.addSubview(checkmark)
+
         pinView.addSubview(iconImageView)
         pinView.addSubview(glossView)
         addSubview(pinView)
+        addSubview(visitedBadge)
         addSubview(nameLabel)
     }
 
@@ -304,6 +321,16 @@ class PlaceAnnotationView: MKAnnotationView {
         iconImageView.frame = pinView.bounds.insetBy(dx: 7, dy: 7)
         glossView.frame = CGRect(x: 0, y: 0, width: 30, height: 15)
         nameLabel.frame = CGRect(x: (totalWidth - labelWidth) / 2, y: 34, width: labelWidth, height: nameLabel.frame.height)
+
+        // Visited badge positioned at top-right of pin
+        visitedBadge.isHidden = !place.visited
+        let badgeSize: CGFloat = 14
+        visitedBadge.frame = CGRect(
+            x: pinView.frame.maxX - badgeSize / 2,
+            y: pinView.frame.minY - badgeSize / 2 + 2,
+            width: badgeSize,
+            height: badgeSize
+        )
     }
 }
 

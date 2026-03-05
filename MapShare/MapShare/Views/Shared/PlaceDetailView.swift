@@ -121,6 +121,18 @@ struct PlaceDetailContent: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
+
+                    Toggle(isOn: Binding(
+                        get: { place.visited },
+                        set: { newValue in
+                            place.visited = newValue
+                            place.modifiedDate = Date()
+                            try? viewContext.save()
+                        }
+                    )) {
+                        Label("Visited", systemImage: place.visited ? "checkmark.circle.fill" : "circle")
+                    }
+                    .tint(.green)
                 }
                 .padding(.horizontal)
 
