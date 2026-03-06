@@ -249,7 +249,7 @@ struct AddPlaceViewEmbedded: View {
     )
     @State private var currentUserParticipant: Participant?
 
-    private let iconOptions = ["mappin", "house", "building.2", "car", "fork.knife", "cup.and.saucer", "cart", "bag", "heart", "star"]
+    private let iconOptions = ["mappin", "house", "building.2", "car", "fork.knife", "cup.and.saucer", "cart", "bag", "heart", "star", "leaf", "building.columns", "theatermasks", "wineglass", "dumbbell", "airplane", "banknote", "bed.double", "cross.case", "graduationcap"]
     private let colorOptions = ["#FF3B30", "#FF9500", "#FFCC02", "#34C759", "#007AFF", "#5856D6", "#AF52DE", "#FF2D92"]
 
     var body: some View {
